@@ -1,14 +1,17 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Card } from '@heroui/react';
 import { Text } from '../../components/Text';
 import { BlockProps } from '../../types';
+import { ChevronUpIcon, ChevronDownIcon, SelectorIcon } from '@heroui/shared-icons';
 
 export type TableRowData = Record<string, string | number | boolean | null | undefined>;
 
 export interface TableColumn {
   header: string;
-  accessorKey: string;
+  accessor: string;
   cell?: (info: TableRowData) => React.ReactNode;
+  sortable?: boolean;
+  Filter?: (info: TableRowData) => boolean;
 }
 
 export interface TableBlockProps extends BlockProps {
@@ -36,13 +39,53 @@ export const TableBlock: React.FC<TableBlockProps> = ({
   showHeader = true,
   className,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  
-  
-  /* eslint-disable-next-line @typescript-eslint/no-unused-vars */
   onChange,
   ...props
 }) => {
+  const [tableData, setTableData] = React.useState(data);
+  const [sortColumn, setSortColumn] = React.useState<string | null>(null);
+  const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc' | null>(null);
+
+  const handleSort = (column: TableColumn) => {
+    if (!column.sortable) {
+      return;
+    }
+
+    let newSortDirection: 'asc' | 'desc' | null = null;
+    if (sortColumn === column.accessor) {
+      if (sortDirection === 'asc') {
+        newSortDirection = 'desc';
+      } else if (sortDirection === 'desc') {
+        newSortDirection = null;
+        setTableData(data);
+      } else {
+        newSortDirection = 'asc';
+      }
+    } else {
+      setSortColumn(column.accessor);
+      newSortDirection = 'asc';
+    }
+    setSortDirection(newSortDirection);
+
+    if (newSortDirection === null) {
+      setTableData(data);
+      return;
+    }
+
+    const sortedData = [...tableData].sort((a, b) => {
+      const aValue = a[column.accessor];
+      const bValue = b[column.accessor];
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        return sortDirection === 'asc' ? bValue.localeCompare(aValue) : aValue.localeCompare(bValue);
+      }
+      if (typeof aValue === 'number' && typeof bValue === 'number') {
+        return sortDirection === 'asc' ? bValue - aValue : aValue - bValue;
+      }
+      return 0;
+    });
+    setTableData(sortedData);
+  };
+
   return (
     <Card
       className={className}
@@ -50,9 +93,9 @@ export const TableBlock: React.FC<TableBlockProps> = ({
       {...props}
     >
       {title && (
-        <Text 
-          as="h3" 
-          size="lg" 
+        <Text
+          as="h3"
+          size="lg"
           weight="medium"
           p="3"
           borderBottom="1px solid"
@@ -61,7 +104,7 @@ export const TableBlock: React.FC<TableBlockProps> = ({
           {title}
         </Text>
       )}
-      
+
       <div style={{ overflowX: 'auto' }}>
         <table
           style={{
@@ -77,31 +120,39 @@ export const TableBlock: React.FC<TableBlockProps> = ({
               </Text>
             </caption>
           )}
-          
+
           {showHeader && (
             <thead>
               <tr>
                 {columns.map((column, index) => (
-                  <th 
-                    key={index}
-                    style={{
-                      textAlign: 'left',
-                      padding: compact ? 'var(--hero-spacing-1)' : 'var(--hero-spacing-2)',
-                      backgroundColor: 'var(--hero-color-muted)',
-                      borderBottom: '1px solid var(--hero-color-border)',
-                      ...(bordered ? { border: '1px solid var(--hero-color-border)' } : {})
-                    }}
-                  >
-                    {column.header}
-                  </th>
+                  <th
+                  key={index}
+                  style={{
+                    textAlign: 'left',
+                    padding: compact ? 'var(--hero-spacing-1)' : 'var(--hero-spacing-2)',
+                    backgroundColor: 'var(--hero-color-muted)',
+                    borderBottom: '1px solid var(--hero-color-border)',
+                    ...(bordered ? { border: '1px solid var(--hero-color-border)' } : {}),
+                  }}
+                  onClick={() => { handleSort(column); }}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                    <span>{column.header}</span>
+                    {column.sortable && (
+                      <span style={{ marginLeft: 'var(--hero-spacing-1)' }}>
+                        {sortDirection === 'asc' ? <ChevronDownIcon /> : (sortDirection === 'desc' ? <ChevronUpIcon /> : <SelectorIcon />)}
+                      </span>
+                    )}
+                  </span>
+                </th>
                 ))}
               </tr>
             </thead>
           )}
-          
+
           <tbody>
-            {data.map((row, rowIndex) => (
-              <tr 
+            {tableData.map((row, rowIndex) => (
+              <tr
                 key={rowIndex}
                 style={{
                   ...(striped && rowIndex % 2 === 1 ? { backgroundColor: 'var(--hero-color-muted-50)' } : {}),
@@ -109,7 +160,7 @@ export const TableBlock: React.FC<TableBlockProps> = ({
                 }}
               >
                 {columns.map((column, colIndex) => (
-                  <td 
+                  <td
                     key={colIndex}
                     style={{
                       padding: compact ? 'var(--hero-spacing-1)' : 'var(--hero-spacing-2)',
@@ -118,15 +169,15 @@ export const TableBlock: React.FC<TableBlockProps> = ({
                       })
                     }}
                   >
-                    {column.cell ? column.cell(row) : row[column.accessorKey]}
+                    {column.cell ? column.cell(row) : row[column.accessor]}
                   </td>
                 ))}
               </tr>
             ))}
-            
-            {data.length === 0 && (
+
+            {tableData.length === 0 && (
               <tr>
-                <td 
+                <td
                   colSpan={columns.length}
                   style={{
                     textAlign: 'center',
@@ -143,4 +194,4 @@ export const TableBlock: React.FC<TableBlockProps> = ({
       </div>
     </Card>
   );
-}; 
+};

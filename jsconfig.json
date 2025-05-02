@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "jsx": "react",
     "baseUrl": ".",
     "paths": {
       "@vibing-ai/block-kit": ["./src"],
@@ -7,4 +8,4 @@
       "@/*": ["./src/*"]
     }
   }
-} 
+}

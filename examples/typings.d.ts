@@ -2,9 +2,12 @@
 declare module '@vibing-ai/block-kit' {
   import { ReactNode, ComponentProps, HTMLAttributes, FormEvent } from 'react';
 
+  // Block types
+  export type TableRowData = Record<string, string | number | boolean | null | undefined>;
+
   // Theme types
   export type ThemeType = 'light' | 'dark' | CustomTheme;
-  
+
   interface CustomTheme {
     type: 'light' | 'dark';
     primary?: string;
@@ -133,13 +136,11 @@ declare module '@vibing-ai/block-kit' {
   interface TableBlockProps {
     id: string;
     data: Array<Record<string, unknown>>;
-    columns: Array<{
-      header: string;
-      accessor: string;
-    }>;
+    columns: Array<TableColumn>;
     striped?: boolean;
     bordered?: boolean;
     compact?: boolean;
+    title?: string;
   }
 
   interface FlowBlockProps {
@@ -266,7 +267,7 @@ declare module '@vibing-ai/block-kit' {
     isActive?: boolean;
     onClick?: () => void;
   }
-  
+
   // Component exports
   export function BlockKitProvider(props: BlockKitProviderProps): JSX.Element;
   export function TextBlock(props: TextBlockProps): JSX.Element;
@@ -295,4 +296,4 @@ declare module '@vibing-ai/block-kit' {
 
   // Theme utilities
   export function createCustomTheme(options: CustomTheme): CustomTheme;
-} 
+}
