@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Card } from '@heroui/react';
 import { Text } from '../../components/Text';
 import { BlockProps } from '../../types';
@@ -24,6 +24,8 @@ export interface TableBlockProps extends BlockProps {
   compact?: boolean;
   title?: string;
   showHeader?: boolean;
+  pageSize?: number;
+  pageNumber?: number;
 }
 
 export const TableBlock: React.FC<TableBlockProps> = ({
@@ -37,6 +39,8 @@ export const TableBlock: React.FC<TableBlockProps> = ({
   compact = false,
   title,
   showHeader = true,
+  pageSize = 10,
+  pageNumber = 1,
   className,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   onChange,
@@ -45,6 +49,25 @@ export const TableBlock: React.FC<TableBlockProps> = ({
   const [tableData, setTableData] = React.useState(data);
   const [sortColumn, setSortColumn] = React.useState<string | null>(null);
   const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc' | null>(null);
+  const [currentPage, setCurrentPage] = React.useState<number>(pageNumber);
+  const totalPages = Math.max(1, Math.ceil(tableData.length / pageSize));
+
+  function getPageNumbers(currentPage: number, totalPages: number): (number | 'ellipsis')[] {
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, currentPage + 2);
+    if (currentPage <= 3) { startPage = 1; endPage = Math.min(5, totalPages); }
+    if (currentPage >= totalPages - 2) { endPage = totalPages; startPage = Math.max(1, totalPages - 4); }
+    const pageNumbers: (number | 'ellipsis')[] = [];
+    pageNumbers.push(1);
+    if (startPage > 2) pageNumbers.push('ellipsis');
+    for (let p = startPage; p <= endPage; p++) if (p !== 1 && p !== totalPages) pageNumbers.push(p);
+    if (endPage < totalPages - 1) pageNumbers.push('ellipsis');
+    if (totalPages > 1) pageNumbers.push(totalPages);
+    return pageNumbers;
+  }
+
+  const pageNumbers = getPageNumbers(currentPage, totalPages);
+  const pagedData = tableData.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const handleSort = (column: TableColumn) => {
     if (!column.sortable) {
@@ -126,32 +149,32 @@ export const TableBlock: React.FC<TableBlockProps> = ({
               <tr>
                 {columns.map((column, index) => (
                   <th
-                  key={index}
-                  style={{
-                    textAlign: 'left',
-                    padding: compact ? 'var(--hero-spacing-1)' : 'var(--hero-spacing-2)',
-                    backgroundColor: 'var(--hero-color-muted)',
-                    borderBottom: '1px solid var(--hero-color-border)',
-                    ...(bordered ? { border: '1px solid var(--hero-color-border)' } : {}),
-                  }}
-                  onClick={() => { handleSort(column); }}
-                >
-                  <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                    <span>{column.header}</span>
-                    {column.sortable && (
-                      <span style={{ marginLeft: 'var(--hero-spacing-1)' }}>
-                        {sortDirection === 'asc' ? <ChevronDownIcon /> : (sortDirection === 'desc' ? <ChevronUpIcon /> : <SelectorIcon />)}
-                      </span>
-                    )}
-                  </span>
-                </th>
+                    key={index}
+                    style={{
+                      textAlign: 'left',
+                      padding: compact ? 'var(--hero-spacing-1)' : 'var(--hero-spacing-2)',
+                      backgroundColor: 'var(--hero-color-muted)',
+                      borderBottom: '1px solid var(--hero-color-border)',
+                      ...(bordered ? { border: '1px solid var(--hero-color-border)' } : {}),
+                    }}
+                    onClick={() => { handleSort(column); }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                      <span>{column.header}</span>
+                      {column.sortable && (
+                        <span style={{ marginLeft: 8, display: 'flex', alignItems: 'center' }}>
+                          {sortDirection === 'asc' ? <ChevronDownIcon /> : (sortDirection === 'desc' ? <ChevronUpIcon /> : <SelectorIcon />)}
+                        </span>
+                      )}
+                    </div>
+                  </th>
                 ))}
               </tr>
             </thead>
           )}
 
           <tbody>
-            {tableData.map((row, rowIndex) => (
+            {pagedData.map((row, rowIndex) => (
               <tr
                 key={rowIndex}
                 style={{
@@ -192,6 +215,80 @@ export const TableBlock: React.FC<TableBlockProps> = ({
           </tbody>
         </table>
       </div>
+      <div className="flex items-center mt-2 w-full">
+  <div className="flex items-center bg-gray-100 rounded-full px-1 py-0.5 w-fit shadow-sm">
+    <button
+      onClick={() => setCurrentPage(1)}
+      disabled={currentPage === 1}
+      className="mx-0.5 w-7 h-7 flex items-center justify-center rounded-full border border-transparent disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none hover:bg-gray-200 text-base"
+      aria-label="First page"
+    >
+      &laquo;
+    </button>
+    <button
+      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+      disabled={currentPage === 1}
+      className="mx-0.5 w-7 h-7 flex items-center justify-center rounded-full border border-transparent disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none hover:bg-gray-200 text-base"
+      aria-label="Previous page"
+    >
+      &lsaquo;
+    </button>
+    {pageNumbers.map((item, idx) =>
+      item === 'ellipsis' ? (
+        <span key={idx} className="mx-0.5 w-7 h-7 flex items-center justify-center select-none text-base">...</span>
+      ) : (
+        <button
+          key={idx}
+          onClick={() => setCurrentPage(item as number)}
+          disabled={item === currentPage}
+          className={[
+            "mx-0.5 w-7 h-7 flex items-center justify-center rounded-full border border-transparent transition-all duration-150",
+            item === currentPage
+              ? "font-bold bg-blue-500 text-white shadow-[0_2px_8px_rgba(0,119,255,0.15)] outline-none"
+              : "hover:bg-gray-200 hover:border-gray-300 text-black",
+            "disabled:bg-blue-500 disabled:text-white disabled:font-bold disabled:cursor-default"
+          ].join(" ")}
+          aria-current={item === currentPage ? 'page' : undefined}
+          style={item === currentPage ? { boxShadow: '0 2px 8px 0 rgba(0,119,255,0.15)' } : {}}
+        >
+          {item}
+        </button>
+      )
+    )}
+    <button
+      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+      disabled={currentPage === totalPages}
+      className="mx-0.5 w-7 h-7 flex items-center justify-center rounded-full border border-transparent disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none hover:bg-gray-200 text-base"
+      aria-label="Next page"
+    >
+      &rsaquo;
+    </button>
+    <button
+      onClick={() => setCurrentPage(totalPages)}
+      disabled={currentPage === totalPages}
+      className="mx-0.5 w-7 h-7 flex items-center justify-center rounded-full border border-transparent disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none hover:bg-gray-200 text-base"
+      aria-label="Last page"
+    >
+      &raquo;
+    </button>
+  </div>
+  <div className="flex ml-auto gap-2">
+    <button
+      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+      disabled={currentPage === 1}
+      className="w-20 h-7 flex items-center justify-center rounded-full border border-gray-300 text-gray-700 bg-white text-sm hover:bg-gray-50 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
+    >
+      Previous
+    </button>
+    <button
+      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+      disabled={currentPage === totalPages}
+      className="w-20 h-7 flex items-center justify-center rounded-full border border-gray-300 text-gray-700 bg-white text-sm hover:bg-gray-50 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
+    >
+      Next
+    </button>
+  </div>
+</div>
     </Card>
   );
 };
