@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react';
 import { TableBlock, TableRowData } from '@vibing-ai/block-kit';
 import { CheckIcon, CloseIcon } from '@heroui/shared-icons';
 import React from 'react';
+import { action } from '@storybook/addon-actions';
 
 const meta: Meta<typeof TableBlock> = {
   title: 'Blocks/Data/TableBlock',
@@ -236,5 +237,7 @@ export const Customized: Story = {
     striped: true,
     bordered: true,
     compact: true,
+    selectable: true,
+    onSelectionChange: action('row-selected'),
   },
 };

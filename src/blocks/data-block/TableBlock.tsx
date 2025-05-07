@@ -1,5 +1,5 @@
 import React from 'react';
-import { Card } from '@heroui/react';
+import { Card, Button } from '@heroui/react';
 import { Text } from '../../components/Text';
 import { BlockProps } from '../../types';
 import { ChevronUpIcon, ChevronDownIcon, SelectorIcon } from '@heroui/shared-icons';
@@ -26,6 +26,9 @@ export interface TableBlockProps extends BlockProps {
   showHeader?: boolean;
   pageSize?: number;
   pageNumber?: number;
+  selectable?: boolean;
+  multiSelect?: boolean;
+  onSelectionChange?: (selectedRows: TableRowData[]) => void;
 }
 
 export const TableBlock: React.FC<TableBlockProps> = ({
@@ -41,6 +44,9 @@ export const TableBlock: React.FC<TableBlockProps> = ({
   showHeader = true,
   pageSize = 10,
   pageNumber = 1,
+  selectable = false,
+  multiSelect = true,
+  onSelectionChange,
   className,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   onChange,
@@ -50,6 +56,7 @@ export const TableBlock: React.FC<TableBlockProps> = ({
   const [sortColumn, setSortColumn] = React.useState<string | null>(null);
   const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc' | null>(null);
   const [currentPage, setCurrentPage] = React.useState<number>(pageNumber);
+  const [selectedRows, setSelectedRows] = React.useState<TableRowData[]>([]);
   const totalPages = Math.max(1, Math.ceil(tableData.length / pageSize));
 
   function getPageNumbers(currentPage: number, totalPages: number): (number | 'ellipsis')[] {
@@ -109,6 +116,22 @@ export const TableBlock: React.FC<TableBlockProps> = ({
     setTableData(sortedData);
   };
 
+  const handleRowSelect = (row: TableRowData) => {
+    const isSelected = selectedRows.includes(row);
+    let newSelectedRows: TableRowData[];
+    if (multiSelect) {
+      newSelectedRows = isSelected
+        ? selectedRows.filter(r => r !== row)
+        : [...selectedRows, row];
+    } else {
+      newSelectedRows = isSelected ? [] : [row];
+    }
+    setSelectedRows(newSelectedRows);
+    if (onSelectionChange) {
+      onSelectionChange(newSelectedRows);
+    }
+  };
+
   return (
     <Card
       className={className}
@@ -127,7 +150,15 @@ export const TableBlock: React.FC<TableBlockProps> = ({
           {title}
         </Text>
       )}
-
+      {selectable && (
+        <div style={{ padding: 'var(--hero-spacing-2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Text size="sm"><strong>{selectedRows.length}</strong> Selected</Text>
+          <div>
+            <Button size="sm" variant="light" disabled>Action A</Button>
+            <Button size="sm" variant="light" disabled className="ml-2">Action B</Button>
+          </div>
+        </div>
+      )}
       <div style={{ overflowX: 'auto' }}>
         <table
           style={{
@@ -147,6 +178,7 @@ export const TableBlock: React.FC<TableBlockProps> = ({
           {showHeader && (
             <thead>
               <tr>
+                {selectable && <th />}
                 {columns.map((column, index) => (
                   <th
                     key={index}
@@ -182,6 +214,18 @@ export const TableBlock: React.FC<TableBlockProps> = ({
                   ...(hoverable ? { ':hover': { backgroundColor: 'var(--hero-color-muted-100)' } } : {})
                 }}
               >
+                {selectable && (
+                  <td style={{
+                    padding: compact ? 'var(--hero-spacing-1)' : 'var(--hero-spacing-2)',
+                    ...(bordered ? { border: '1px solid var(--hero-color-border)' } : { borderBottom: '1px solid var(--hero-color-border)' })
+                  }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedRows.includes(row)}
+                      onChange={() => handleRowSelect(row)}
+                    />
+                  </td>
+                )}
                 {columns.map((column, colIndex) => (
                   <td
                     key={colIndex}
@@ -201,7 +245,7 @@ export const TableBlock: React.FC<TableBlockProps> = ({
             {tableData.length === 0 && (
               <tr>
                 <td
-                  colSpan={columns.length}
+                  colSpan={columns.length + (selectable ? 1 : 0)}
                   style={{
                     textAlign: 'center',
                     padding: 'var(--hero-spacing-4)',
@@ -216,79 +260,68 @@ export const TableBlock: React.FC<TableBlockProps> = ({
         </table>
       </div>
       <div className="flex items-center mt-2 w-full">
-  <div className="flex items-center bg-gray-100 rounded-full px-1 py-0.5 w-fit shadow-sm">
-    <button
-      onClick={() => setCurrentPage(1)}
-      disabled={currentPage === 1}
-      className="mx-0.5 w-7 h-7 flex items-center justify-center rounded-full border border-transparent disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none hover:bg-gray-200 text-base"
-      aria-label="First page"
-    >
-      &laquo;
-    </button>
-    <button
-      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-      disabled={currentPage === 1}
-      className="mx-0.5 w-7 h-7 flex items-center justify-center rounded-full border border-transparent disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none hover:bg-gray-200 text-base"
-      aria-label="Previous page"
-    >
-      &lsaquo;
-    </button>
-    {pageNumbers.map((item, idx) =>
-      item === 'ellipsis' ? (
-        <span key={idx} className="mx-0.5 w-7 h-7 flex items-center justify-center select-none text-base">...</span>
-      ) : (
-        <button
-          key={idx}
-          onClick={() => setCurrentPage(item as number)}
-          disabled={item === currentPage}
-          className={[
-            "mx-0.5 w-7 h-7 flex items-center justify-center rounded-full border border-transparent transition-all duration-150",
-            item === currentPage
-              ? "font-bold bg-blue-500 text-white shadow-[0_2px_8px_rgba(0,119,255,0.15)] outline-none"
-              : "hover:bg-gray-200 hover:border-gray-300 text-black",
-            "disabled:bg-blue-500 disabled:text-white disabled:font-bold disabled:cursor-default"
-          ].join(" ")}
-          aria-current={item === currentPage ? 'page' : undefined}
-          style={item === currentPage ? { boxShadow: '0 2px 8px 0 rgba(0,119,255,0.15)' } : {}}
-        >
-          {item}
-        </button>
-      )
-    )}
-    <button
-      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-      disabled={currentPage === totalPages}
-      className="mx-0.5 w-7 h-7 flex items-center justify-center rounded-full border border-transparent disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none hover:bg-gray-200 text-base"
-      aria-label="Next page"
-    >
-      &rsaquo;
-    </button>
-    <button
-      onClick={() => setCurrentPage(totalPages)}
-      disabled={currentPage === totalPages}
-      className="mx-0.5 w-7 h-7 flex items-center justify-center rounded-full border border-transparent disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none hover:bg-gray-200 text-base"
-      aria-label="Last page"
-    >
-      &raquo;
-    </button>
-  </div>
-  <div className="flex ml-auto gap-2">
-    <button
-      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-      disabled={currentPage === 1}
-      className="w-20 h-7 flex items-center justify-center rounded-full border border-gray-300 text-gray-700 bg-white text-sm hover:bg-gray-50 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
-    >
-      Previous
-    </button>
-    <button
-      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-      disabled={currentPage === totalPages}
-      className="w-20 h-7 flex items-center justify-center rounded-full border border-gray-300 text-gray-700 bg-white text-sm hover:bg-gray-50 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
-    >
-      Next
-    </button>
-  </div>
-</div>
+        <div className="flex items-center bg-gray-100 rounded-full px-1 py-0.5 w-fit shadow-sm">
+          <button
+            onClick={() => setCurrentPage(1)}
+            disabled={currentPage === 1}
+            className="mx-0.5 w-7 h-7 flex items-center justify-center rounded-full border border-transparent disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none hover:bg-gray-200 text-base"
+            aria-label="First page"
+          >
+            &laquo;
+          </button>
+          <button
+            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+            disabled={currentPage === 1}
+            className="mx-0.5 w-7 h-7 flex items-center justify-center rounded-full border border-transparent disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none hover:bg-gray-200 text-base"
+            aria-label="Previous page"
+          >
+            &lsaquo;
+          </button>
+          {pageNumbers.map((item, idx) =>
+            item === 'ellipsis' ? (
+              <span key={idx} className="mx-0.5 w-7 h-7 flex items-center justify-center select-none text-base">...</span>
+            ) : (
+              <button
+                key={idx}
+                onClick={() => setCurrentPage(item as number)}
+                disabled={item === currentPage}
+                className={[
+                  "mx-0.5 w-7 h-7 flex items-center justify-center rounded-full border border-transparent transition-all duration-150",
+                  item === currentPage
+                    ? "font-bold bg-blue-500 text-white shadow-[0_2px_8px_rgba(0,119,255,0.15)] outline-none"
+                    : "hover:bg-gray-200 hover:border-gray-300 text-black",
+                  "disabled:bg-blue-500 disabled:text-white disabled:font-bold disabled:cursor-default"
+                ].join(" ")}
+                aria-current={item === currentPage ? 'page' : undefined}
+                style={item === currentPage ? { boxShadow: '0 2px 8px 0 rgba(0,119,255,0.15)' } : {}}
+              >
+                {item}
+              </button>
+            )
+          )}
+        </div>
+        <div className="flex ml-auto gap-2">
+          {selectable && (
+            <div className="ml-4">
+              <Text size="sm"><strong>{selectedRows.length}</strong> of <strong>{tableData.length}</strong> selected</Text>
+            </div>
+          )}
+          <button
+            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+            disabled={currentPage === 1}
+            className="w-20 h-7 flex items-center justify-center rounded-full border border-gray-300 text-gray-700 bg-white text-sm hover:bg-gray-50 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Previous
+          </button>
+          <button
+            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+            disabled={currentPage === totalPages}
+            className="w-20 h-7 flex items-center justify-center rounded-full border border-gray-300 text-gray-700 bg-white text-sm hover:bg-gray-50 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Next
+          </button>
+        </div>
+      </div>
     </Card>
   );
 };

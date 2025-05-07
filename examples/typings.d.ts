@@ -141,6 +141,8 @@ declare module '@vibing-ai/block-kit' {
     bordered?: boolean;
     compact?: boolean;
     title?: string;
+    selectable?: boolean;
+    onSelectionChange?: (selectedRows: Array<Record<string, unknown>>) => void;
   }
 
   interface FlowBlockProps {
