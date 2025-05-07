@@ -1,8 +1,9 @@
 import React from 'react';
-import { Card, Button } from '@heroui/react';
+import { Card, Button, Input } from '@heroui/react';
 import { Text } from '../../components/Text';
 import { BlockProps } from '../../types';
 import { ChevronUpIcon, ChevronDownIcon, SelectorIcon } from '@heroui/shared-icons';
+import { Icon } from '@iconify/react';
 
 export type TableRowData = Record<string, string | number | boolean | null | undefined>;
 
@@ -57,7 +58,23 @@ export const TableBlock: React.FC<TableBlockProps> = ({
   const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc' | null>(null);
   const [currentPage, setCurrentPage] = React.useState<number>(pageNumber);
   const [selectedRows, setSelectedRows] = React.useState<TableRowData[]>([]);
+  const [searchTerm, setSearchTerm] = React.useState<string>('');
   const totalPages = Math.max(1, Math.ceil(tableData.length / pageSize));
+
+  React.useEffect(() => {
+    if (searchTerm) {
+      const filtered = data.filter(row =>
+        columns.some(column => {
+          const val = row[column.accessor];
+          return val != null && val.toString().toLowerCase().includes(searchTerm.toLowerCase());
+        })
+      );
+      setTableData(filtered);
+    } else {
+      setTableData(data);
+    }
+    setCurrentPage(1);
+  }, [searchTerm, data, columns]);
 
   function getPageNumbers(currentPage: number, totalPages: number): (number | 'ellipsis')[] {
     let startPage = Math.max(1, currentPage - 2);
@@ -161,15 +178,27 @@ export const TableBlock: React.FC<TableBlockProps> = ({
           {title}
         </Text>
       )}
-      {selectable && (
-        <div style={{ padding: 'var(--hero-spacing-2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Text size="sm"><strong>{selectedRows.length}</strong> Selected</Text>
-          <div>
-            <Button size="sm" variant="light" disabled>Action A</Button>
-            <Button size="sm" variant="light" disabled className="ml-2">Action B</Button>
+      <div style={{ padding: 'var(--hero-spacing-2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', gap: 'var(--hero-spacing-2)', alignItems: 'center' }}>
+          <div style={{ position: 'relative', width: '200px' }}>
+            <Input
+              placeholder="Search"
+              value={searchTerm}
+              size="sm"
+              style={{ paddingRight: '2.25rem' }}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
+            />
+            <Icon icon="heroicons-outline:search" style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', width: '1.25rem', height: '1.25rem', color: '#A0AEC0', pointerEvents: 'none' }} />
           </div>
+          <Button size="sm" variant="light"><Icon icon="heroicons-outline:funnel" className="w-4 h-4 mr-1" />Filter</Button>
+          <Button size="sm" variant="light"><Icon icon="heroicons-outline:arrows-up-down" className="w-4 h-4 mr-1" />Sort</Button>
+          <Button size="sm" variant="light"><Icon icon="heroicons-outline:view-grid" className="w-4 h-4 mr-1" />Columns</Button>
         </div>
-      )}
+        <div style={{ display: 'flex', gap: 'var(--hero-spacing-2)', alignItems: 'center' }}>
+          {selectable && <Text size="sm"><strong>{selectedRows.length}</strong> Selected</Text>}
+          <Button size="sm" variant="light" disabled={selectedRows.length === 0}>Selected Actions <SelectorIcon /></Button>
+        </div>
+      </div>
       <div style={{ overflowX: 'auto' }}>
         <table
           style={{
