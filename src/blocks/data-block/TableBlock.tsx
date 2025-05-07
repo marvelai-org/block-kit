@@ -132,6 +132,17 @@ export const TableBlock: React.FC<TableBlockProps> = ({
     }
   };
 
+  const handleSelectAll = () => {
+    let newSelected: TableRowData[] = [];
+    if (selectedRows.length === tableData.length) {
+      newSelected = [];
+    } else {
+      newSelected = [...tableData];
+    }
+    setSelectedRows(newSelected);
+    if (onSelectionChange) onSelectionChange(newSelected);
+  };
+
   return (
     <Card
       className={className}
@@ -178,7 +189,15 @@ export const TableBlock: React.FC<TableBlockProps> = ({
           {showHeader && (
             <thead>
               <tr>
-                {selectable && <th />}
+                {selectable && (
+                  <th style={{ padding: compact ? 'var(--hero-spacing-1)' : 'var(--hero-spacing-2)', borderBottom: '1px solid var(--hero-color-border)', textAlign: 'center' }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedRows.length === tableData.length}
+                      onChange={handleSelectAll}
+                    />
+                  </th>
+                )}
                 {columns.map((column, index) => (
                   <th
                     key={index}
@@ -217,6 +236,7 @@ export const TableBlock: React.FC<TableBlockProps> = ({
                 {selectable && (
                   <td style={{
                     padding: compact ? 'var(--hero-spacing-1)' : 'var(--hero-spacing-2)',
+                    textAlign: 'center',
                     ...(bordered ? { border: '1px solid var(--hero-color-border)' } : { borderBottom: '1px solid var(--hero-color-border)' })
                   }}>
                     <input
