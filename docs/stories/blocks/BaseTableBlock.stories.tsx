@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { BaseTableBlock, BaseTableBlockColumn } from '../../../src/blocks/data-block/BaseTableBlock';
 import React from 'react';
+import { fn } from '@storybook/test';
 
 const meta: Meta<typeof BaseTableBlock> = {
   title: 'Blocks/Data/BaseTableBlock',
@@ -33,6 +34,8 @@ export const Basic: Story = {
   args: {
     columns,
     data,
+    onSelectionChange: fn(),
+    onSortChange: fn(),
   },
 };
 
@@ -44,5 +47,60 @@ export const WithCustomCells: Story = {
       { header: 'Status', accessor: 'status' },
     ],
     data,
+    onSelectionChange: fn(),
+    onSortChange: fn(),
+  },
+};
+
+export const SingleSelect: Story = {
+  args: {
+    columns,
+    data,
+    selectable: true,
+    multiSelect: false,
+    onSelectionChange: fn(),
+    onSortChange: fn(),
+  },
+};
+
+export const MultiSelect: Story = {
+  args: {
+    columns,
+    data,
+    selectable: true,
+    multiSelect: true,
+    onSelectionChange: fn(),
+    onSortChange: fn(),
+  },
+};
+
+export const ControlledSelection: Story = {
+  render: (args) => {
+    const [selectedRows, setSelectedRows] = React.useState([data[0]]);
+    return (
+      <BaseTableBlock
+        {...args}
+        selectable
+        multiSelect
+        selectedRows={selectedRows}
+        onSelectionChange={setSelectedRows}
+        onSortChange={fn()}
+      />
+    );
+  },
+  args: {
+    columns,
+    data,
+    onSelectionChange: fn(),
+    onSortChange: fn(),
+  },
+};
+
+export const Sortable: Story = {
+  args: {
+    columns: columns.map(col => ({ ...col, sortable: true })),
+    data,
+    onSelectionChange: fn(),
+    onSortChange: fn(),
   },
 };
