@@ -27,6 +27,7 @@ export interface BaseTableBlockProps<T> {
   onSortChange?: (col: string, dir: 'asc' | 'desc' | null) => void;
   className?: string;
   style?: React.CSSProperties;
+  // defaultSelectedRows removed (was unused)
 }
 
 function getRowId<T extends Record<string, any>>(row: T, idx: number): string {
@@ -40,7 +41,6 @@ export function BaseTableBlock<T extends Record<string, any>>({
   selectable = false,
   multiSelect = false,
   selectedRows,
-  defaultSelectedRows,
   onSelectionChange,
   sortColumn,
   sortDirection,
@@ -55,35 +55,41 @@ export function BaseTableBlock<T extends Record<string, any>>({
       cols.push({
         id: 'selection',
         Header: function SelectionHeader({ getToggleAllRowsSelectedProps }: { getToggleAllRowsSelectedProps: () => any }) {
+          // Only spread indeterminate if true to avoid React warning
+          const props = getToggleAllRowsSelectedProps();
+          const { indeterminate, ...rest } = props;
           return multiSelect ? (
             <input
               type="checkbox"
               aria-label="select all"
-              {...getToggleAllRowsSelectedProps()}
+              {...rest}
+              {...(indeterminate ? { indeterminate } : {})}
+              tabIndex={0}
             />
           ) : null;
         },
-        Cell: (cellProps: { row: any }) => {
+        Cell: (cellProps: { row: import('react-table').Row<T> }) => {
           const { row } = cellProps;
-          // Access these from the table instance closure
-          // They are available in the component scope
+          const rowSelectProps = row.getToggleRowSelectedProps ? row.getToggleRowSelectedProps() : {};
+          const { indeterminate, onChange, ...rest } = rowSelectProps;
+          // In single-select mode, override onChange to ensure only one row is selected
+          const instance = row.table || row._getInstance?.(); // fallback for react-table v7
           return (
             <input
               type="checkbox"
               aria-label={`select row ${row.index + 1}`}
-              checked={row.isSelected}
-              onChange={() => {
-                if (multiSelect) {
-                  row.toggleRowSelected();
-                } else {
-                  if (!row.isSelected) {
-                    toggleAllRowsSelected(false);
-                    toggleRowSelected(row.id, true);
-                  } else {
-                    toggleRowSelected(row.id, false);
-                  }
+              checked={!!row.isSelected}
+              tabIndex={0}
+              {...rest}
+              {...(indeterminate ? { indeterminate } : {})}
+              onChange={multiSelect ? onChange : (() => {
+                if (instance?.toggleAllRowsSelected) instance.toggleAllRowsSelected(false);
+                if (row.toggleRowSelected) row.toggleRowSelected(true);
+                // Call onSelectionChange immediately with only this row
+                if (typeof onSelectionChange === 'function') {
+                  onSelectionChange([row.original]);
                 }
-              }}
+              })}
             />
           );
         },
@@ -100,7 +106,11 @@ export function BaseTableBlock<T extends Record<string, any>>({
           disableSortBy: !col.sortable,
           Cell: col.cell
             ? ({ row }: { row: { original: T } }) => col.cell!(row.original)
-            : ({ value }: { value: any }) => value,
+            : ({ value, row }: { value: any, row: { original: T } }) => {
+                // Fallback to raw value from row data if value is undefined
+                const accessor = col.accessor as keyof T;
+                return value !== undefined ? value : row.original[accessor];
+              },
         } as Column<T>;
       })
     );
@@ -166,7 +176,8 @@ export function BaseTableBlock<T extends Record<string, any>>({
 
   // Selection effect
   useEffect(() => {
-    if (onSelectionChange) {
+    // Only call onSelectionChange from effect in multi-select mode
+    if (multiSelect && onSelectionChange) {
       if (isControlledSelection) {
         onSelectionChange(selectedRows || []);
       } else {
@@ -174,7 +185,7 @@ export function BaseTableBlock<T extends Record<string, any>>({
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedFlatRows, onSelectionChange]);
+  }, [multiSelect, selectedFlatRows, onSelectionChange]);
 
   // Sorting effect
   useEffect(() => {
@@ -198,10 +209,10 @@ export function BaseTableBlock<T extends Record<string, any>>({
 
   return (
     <div style={style}>
-      <table className={className} style={{ width: '100%' }} {...getTableProps()}>
+      <table className={className} style={{ width: '100%' }} {...getTableProps()} role="table">
         <thead>
           {headerGroups.map((headerGroup, i) => (
-            <tr {...headerGroup.getHeaderGroupProps()} key={i}>
+            <tr {...headerGroup.getHeaderGroupProps()} key={i} role="row">
               {headerGroup.headers.map((column, idx) => (
                 <th
                   {...column.getHeaderProps(
@@ -209,46 +220,61 @@ export function BaseTableBlock<T extends Record<string, any>>({
                   )}
                   key={idx}
                   style={{ cursor: (column as any).canSort ? 'pointer' : undefined, textAlign: 'left' }}
+                  aria-sort={
+                    (column as any).canSort
+                      ? (column as any).isSorted
+                        ? (column as any).isSortedDesc
+                          ? 'descending'
+                          : 'ascending'
+                        : 'none'
+                      : undefined
+                  }
                   onClick={() => {
                     if ((column as any).canSort) {
                       (column as any).toggleSortBy();
                     }
                   }}
+                  onKeyDown={e => {
+                    if ((column as any).canSort && (e.key === 'Enter' || e.key === ' ')) {
+                      e.preventDefault();
+                      (column as any).toggleSortBy();
+                    }
+                  }}
                 >
                   {(column as any).canSort ? (
-  <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-    <span>{column.render('Header')}</span>
-    <span style={{ marginLeft: 8, display: 'flex', alignItems: 'center', color: (column as any).isSorted ? '#2563eb' : '#888' }}>
-      {(column as any).isSorted
-        ? ((column as any).isSortedDesc
-          ? <ChevronDownIcon />
-          : <ChevronUpIcon />)
-        : <SelectorIcon />}
-    </span>
-  </span>
-) : (
-  <span>{column.render('Header')}</span>
-)}
+                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                      <span>{column.render('Header')}</span>
+                      <span style={{ marginLeft: 8, display: 'flex', alignItems: 'center', color: (column as any).isSorted ? '#2563eb' : '#888' }}>
+                        {(column as any).isSorted
+                          ? ((column as any).isSortedDesc
+                            ? <ChevronDownIcon />
+                            : <ChevronUpIcon />)
+                          : <SelectorIcon />}
+                      </span>
+                    </span>
+                  ) : (
+                    <span>{column.render('Header')}</span>
+                  )}
                 </th>
               ))}
             </tr>
           ))}
         </thead>
-      <tbody {...getTableBodyProps()}>
-        {rows.map((row, rowIdx) => {
-          prepareRow(row);
-          return (
-            <tr {...row.getRowProps()} key={rowIdx}>
-              {row.cells.map((cell, colIdx) => (
-                <td {...cell.getCellProps()} key={colIdx}>
-                  {cell.render('Cell')}
-                </td>
-              ))}
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
+        <tbody {...getTableBodyProps()}>
+          {rows.map((row, rowIdx) => {
+            prepareRow(row);
+            return (
+              <tr {...row.getRowProps()} key={rowIdx}>
+                {row.cells.map((cell, colIdx) => (
+                  <td {...cell.getCellProps()} key={colIdx}>
+                    {cell.render('Cell')}
+                  </td>
+                ))}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
