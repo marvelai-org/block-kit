@@ -1,8 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
-import { TableBlock, TableRowData } from '@vibing-ai/block-kit';
+import { TableBlock, TableRowData } from '@/blocks/data-block/TableBlock';
 import { CheckIcon, CloseIcon } from '@heroui/shared-icons';
-import React from 'react';
-import { action } from '@storybook/addon-actions';
+import { fn } from '@storybook/test';
 
 const meta: Meta<typeof TableBlock> = {
   title: 'Blocks/Data/TableBlock',
@@ -14,6 +13,10 @@ const meta: Meta<typeof TableBlock> = {
     striped: { control: 'boolean' },
     bordered: { control: 'boolean' },
     compact: { control: 'boolean' },
+  },
+  args: {
+    onSelectionChange: fn(),
+    onSortChange: fn(),
   },
 };
 
@@ -33,6 +36,8 @@ export const Basic: Story = {
       { name: 'Caleb Stone', age: 34, status: 'Inactive' },
       { name: 'Bob Johnson', age: 45, status: 'Active' },
     ],
+    onSelectionChange: fn(),
+    onSortChange: fn(),
   },
 };
 
@@ -50,6 +55,8 @@ export const WithTitle: Story = {
       { name: 'Bob Johnson', age: 45, status: 'Active' },
     ],
     title: 'List of Users',
+    onSelectionChange: fn(),
+    onSortChange: fn(),
   },
 };
 
@@ -58,7 +65,7 @@ export const Customized: Story = {
     id: 'table-block-customized-example',
     columns: [
       { header: 'Name', accessor: 'name', sortable: true },
-      { header: 'Age', accessor: 'age' },
+      { header: 'Age', accessor: 'age', sortable: true },
       { header: 'Status', accessor: 'status', cell: (info: TableRowData) =>
         info.status === 'Active'
           ? <CheckIcon style={{ color: 'green' }} />
@@ -238,6 +245,7 @@ export const Customized: Story = {
     bordered: true,
     compact: true,
     selectable: true,
-    onSelectionChange: action('row-selected'),
+    onSelectionChange: fn(),
+    onSortChange: fn(),
   },
 };

@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react';
-import { BaseTableBlock, BaseTableBlockColumn } from '../../../src/blocks/data-block/BaseTableBlock';
+import { BaseTableBlock, BaseTableBlockColumn } from '@/blocks/data-block/BaseTableBlock';
 import React from 'react';
 import { fn } from '@storybook/test';
 

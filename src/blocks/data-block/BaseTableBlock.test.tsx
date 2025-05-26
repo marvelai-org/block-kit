@@ -146,4 +146,54 @@ describe('BaseTableBlock', () => {
     const checkbox = screen.getByRole('checkbox', { name: /select row 2/i });
     expect(checkbox).toBeChecked();
   });
+
+  it('supports controlled sorting: parent updates sortColumn/sortDirection', () => {
+    function ControlledWrapper() {
+      const [sortColumn, setSortColumn] = React.useState<string | null>(null);
+      const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc' | null>(null);
+      // Sort data manually for test
+      let sorted = [...data];
+      if (sortColumn && sortDirection) {
+        sorted.sort((a, b) => {
+          const av = a[sortColumn as keyof RowData];
+          const bv = b[sortColumn as keyof RowData];
+          if (av === bv) return 0;
+          if (sortDirection === 'asc') return av < bv ? -1 : 1;
+          return av > bv ? -1 : 1;
+        });
+      }
+      return (
+        <BaseTableBlock
+          columns={columns}
+          data={sorted}
+          sortColumn={sortColumn}
+          sortDirection={sortDirection}
+          onSortChange={(col, dir) => {
+            setSortColumn(col);
+            setSortDirection(dir);
+          }}
+        />
+      );
+    }
+    // Initial: unsorted
+    render(<ControlledWrapper />);
+    // Click Age header (should sort asc)
+    fireEvent.click(screen.getByText('Age'));
+    let rows = screen.getAllByRole('row');
+    expect(rows[1]).toHaveTextContent('Bob');
+    expect(rows[2]).toHaveTextContent('Alice');
+    expect(rows[3]).toHaveTextContent('Charlie');
+    // Click Age header again (should sort desc)
+    fireEvent.click(screen.getByText('Age'));
+    rows = screen.getAllByRole('row');
+    expect(rows[1]).toHaveTextContent('Charlie');
+    expect(rows[2]).toHaveTextContent('Alice');
+    expect(rows[3]).toHaveTextContent('Bob');
+    // Click Name header (should sort by Name asc)
+    fireEvent.click(screen.getByText('Name'));
+    rows = screen.getAllByRole('row');
+    expect(rows[1]).toHaveTextContent('Alice');
+    expect(rows[2]).toHaveTextContent('Bob');
+    expect(rows[3]).toHaveTextContent('Charlie');
+  });
 });

@@ -2,8 +2,8 @@ import React from 'react';
 import { Card, Button, Input } from '@heroui/react';
 import { Text } from '../../components/Text';
 import { BlockProps } from '../../types';
-import { ChevronUpIcon, ChevronDownIcon, SelectorIcon } from '@heroui/shared-icons';
 import { Icon } from '@iconify/react';
+import { BaseTableBlock, BaseTableBlockColumn } from './BaseTableBlock';
 
 export type TableRowData = Record<string, string | number | boolean | null | undefined>;
 
@@ -19,12 +19,8 @@ export interface TableBlockProps extends BlockProps {
   columns: TableColumn[];
   data: TableRowData[];
   caption?: string;
-  striped?: boolean;
-  bordered?: boolean;
-  hoverable?: boolean;
   compact?: boolean;
   title?: string;
-  showHeader?: boolean;
   pageSize?: number;
   pageNumber?: number;
   selectable?: boolean;
@@ -37,12 +33,8 @@ export const TableBlock: React.FC<TableBlockProps> = ({
   columns,
   data,
   caption,
-  striped = true,
-  bordered = true,
-  hoverable = true,
   compact = false,
   title,
-  showHeader = true,
   pageSize = 10,
   pageNumber = 1,
   selectable = false,
@@ -86,7 +78,6 @@ export const TableBlock: React.FC<TableBlockProps> = ({
   // Columns visibility
 
   const [visibleColumns, setVisibleColumns] = React.useState<string[]>(columns.map(c => c.accessor));
-  const [hoveredCol, setHoveredCol] = React.useState<number | null>(null);
   React.useEffect(() => {
     setVisibleColumns(columns.map(c => c.accessor));
   }, [columns]);
@@ -100,45 +91,52 @@ export const TableBlock: React.FC<TableBlockProps> = ({
   const showAllColumns = () => setVisibleColumns(columns.map(c => c.accessor));
   const hideAllColumns = () => setVisibleColumns([]);
 
-  React.useEffect(() => {
-    if (!sortColumn || !sortDirection) {
-      setTableData(data);
-      return;
-    }
-    const sorted = [...data].sort((a, b) => {
-      const aVal = a[sortColumn];
-      const bVal = b[sortColumn];
-      if (aVal == null && bVal == null) return 0;
-      if (aVal == null) return sortDirection === 'asc' ? -1 : 1;
-      if (bVal == null) return sortDirection === 'asc' ? 1 : -1;
-      if (typeof aVal === 'number' && typeof bVal === 'number') {
-        return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
-      }
-      return sortDirection === 'asc'
-        ? String(aVal).localeCompare(String(bVal))
-        : String(bVal).localeCompare(String(aVal));
-    });
-    setTableData(sorted);
-  }, [sortColumn, sortDirection, data]);
   const [currentPage, setCurrentPage] = React.useState<number>(pageNumber);
   const [selectedRows, setSelectedRows] = React.useState<TableRowData[]>([]);
   const [searchTerm, setSearchTerm] = React.useState<string>('');
-  const totalPages = Math.max(1, Math.ceil(tableData.length / pageSize));
+
+  // Compose filtering and sorting
+  const filteredData = React.useMemo(() => {
+    if (!searchTerm) return data;
+    return data.filter(row =>
+      columns.some(column => {
+        const val = row[column.accessor];
+        return val != null && val.toString().toLowerCase().includes(searchTerm.toLowerCase());
+      })
+    );
+  }, [searchTerm, data, columns]);
+
+  // Sorted data based on sortColumn/sortDirection
+  const sortedData = React.useMemo(() => {
+    if (sortColumn && sortDirection) {
+      const result = [...filteredData].sort((a, b) => {
+        const av = a[sortColumn];
+        const bv = b[sortColumn];
+        // Handle null/undefined
+        if (av == null && bv == null) return 0;
+        if (av == null) return sortDirection === 'asc' ? 1 : -1;
+        if (bv == null) return sortDirection === 'asc' ? -1 : 1;
+        // Handle string and number
+        if (typeof av === 'number' && typeof bv === 'number') {
+          return sortDirection === 'asc' ? av - bv : bv - av;
+        }
+        const avStr = av.toString();
+        const bvStr = bv.toString();
+        if (avStr === bvStr) return 0;
+        if (sortDirection === 'asc') return avStr < bvStr ? -1 : 1;
+        return avStr > bvStr ? -1 : 1;
+      });
+      return result;
+    }
+    return filteredData;
+  }, [filteredData, sortColumn, sortDirection]);
 
   React.useEffect(() => {
-    if (searchTerm) {
-      const filtered = data.filter(row =>
-        columns.some(column => {
-          const val = row[column.accessor];
-          return val != null && val.toString().toLowerCase().includes(searchTerm.toLowerCase());
-        })
-      );
-      setTableData(filtered);
-    } else {
-      setTableData(data);
-    }
+    setTableData(sortedData);
     setCurrentPage(1);
-  }, [searchTerm, data, columns]);
+  }, [sortedData]);
+
+  const totalPages = React.useMemo(() => Math.max(1, Math.ceil(tableData.length / pageSize)), [tableData, pageSize]);
 
   function getPageNumbers(currentPage: number, totalPages: number): (number | 'ellipsis')[] {
     let startPage = Math.max(1, currentPage - 2);
@@ -157,71 +155,23 @@ export const TableBlock: React.FC<TableBlockProps> = ({
   const pageNumbers = getPageNumbers(currentPage, totalPages);
   const pagedData = tableData.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
-  const handleSort = (column: TableColumn) => {
-    if (!column.sortable) {
-      return;
-    }
+  const baseColumns: BaseTableBlockColumn<TableRowData>[] = columns
+    .filter(c => visibleColumns.includes(c.accessor))
+    .map(c => ({
+      header: c.header,
+      accessor: c.accessor,
+      sortable: c.sortable,
+      cell: c.cell,
+    }));
 
-    let newSortDirection: 'asc' | 'desc' | null = null;
-
-    if (sortColumn === column.accessor) {
-      if (sortDirection === 'asc') {
-        newSortDirection = 'desc';
-      } else if (sortDirection === 'desc') {
-        newSortDirection = null;
-      } else {
-        newSortDirection = 'asc';
-      }
-    } else {
-      setSortColumn(column.accessor);
-      newSortDirection = 'asc';
-    }
-    setSortDirection(newSortDirection);
-
-    if (newSortDirection === null) {
-      setTableData(data);
-      return;
-    }
-
-    const sortedData = [...tableData].sort((a, b) => {
-      const aValue = a[column.accessor];
-      const bValue = b[column.accessor];
-      if (typeof aValue === 'string' && typeof bValue === 'string') {
-        return sortDirection === 'asc' ? bValue.localeCompare(aValue) : aValue.localeCompare(bValue);
-      }
-      if (typeof aValue === 'number' && typeof bValue === 'number') {
-        return sortDirection === 'asc' ? bValue - aValue : aValue - bValue;
-      }
-      return 0;
-    });
-    setTableData(sortedData);
+  const handleSelectionChange = (rows: TableRowData[]) => {
+    setSelectedRows(rows);
+    if (onSelectionChange) onSelectionChange(rows);
   };
 
-  const handleRowSelect = (row: TableRowData) => {
-    const isSelected = selectedRows.includes(row);
-    let newSelectedRows: TableRowData[];
-    if (multiSelect) {
-      newSelectedRows = isSelected
-        ? selectedRows.filter(r => r !== row)
-        : [...selectedRows, row];
-    } else {
-      newSelectedRows = isSelected ? [] : [row];
-    }
-    setSelectedRows(newSelectedRows);
-    if (onSelectionChange) {
-      onSelectionChange(newSelectedRows);
-    }
-  };
-
-  const handleSelectAll = () => {
-    let newSelected: TableRowData[] = [];
-    if (selectedRows.length === tableData.length) {
-      newSelected = [];
-    } else {
-      newSelected = [...tableData];
-    }
-    setSelectedRows(newSelected);
-    if (onSelectionChange) onSelectionChange(newSelected);
+  const handleSortChange = (col: string, dir: 'asc' | 'desc' | null) => {
+    setSortColumn(dir ? col : null);
+    setSortDirection(dir);
   };
 
   return (
@@ -283,13 +233,17 @@ export const TableBlock: React.FC<TableBlockProps> = ({
                 }}
               >
                 <div style={{ fontWeight: 500, marginBottom: 8 }}>Sort by</div>
-                {columns.map(col => (
+                {columns.filter(c => c.sortable).map(col => (
                   <label key={col.accessor} style={{ display: 'block', marginBottom: 6, cursor: 'pointer' }}>
                     <input
                       type="radio"
                       name="sort-column"
                       checked={sortColumn === col.accessor}
-                      onChange={() => { setSortColumn(col.accessor); setSortDirection('asc'); }}
+                      aria-label={col.header}
+                      onChange={() => {
+                        setSortColumn(col.accessor);
+                        setSortDirection(dir => dir ?? 'asc');
+                      }}
                       style={{ marginRight: 8 }}
                     />
                     {col.header}
@@ -309,6 +263,7 @@ export const TableBlock: React.FC<TableBlockProps> = ({
                       outline: 'none',
                     }}
                     onClick={() => setSortDirection('asc')}
+                    disabled={!sortColumn}
                   >Asc</button>
                   <button
                     type="button"
@@ -323,8 +278,27 @@ export const TableBlock: React.FC<TableBlockProps> = ({
                       outline: 'none',
                     }}
                     onClick={() => setSortDirection('desc')}
+                    disabled={!sortColumn}
                   >Desc</button>
                 </div>
+                <button
+                  type="button"
+                  style={{
+                    padding: '4px 12px',
+                    borderRadius: 4,
+                    border: '1px solid #e5e7eb',
+                    background: '#f3f4f6',
+                    color: '#2563eb',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    outline: 'none',
+                    width: '100%',
+                    marginTop: 10
+                  }}
+                  onClick={() => { setSortColumn(null); setSortDirection(null); }}
+                >
+                  Clear sorting
+                </button>
               </div>
             )}
           </div>
@@ -387,131 +361,28 @@ export const TableBlock: React.FC<TableBlockProps> = ({
         </div>
         <div style={{ display: 'flex', gap: 'var(--hero-spacing-2)', alignItems: 'center' }}>
           {selectable && <Text size="sm"><strong>{selectedRows.length}</strong> Selected</Text>}
-          <Button size="sm" variant="light" disabled={selectedRows.length === 0}>Selected Actions <SelectorIcon /></Button>
+          <Button size="sm" variant="light" disabled={selectedRows.length === 0}>Selected Actions</Button>
         </div>
       </div>
       <div style={{ overflowX: 'auto' }}>
-        <table
-          style={{
-            width: '100%',
-            borderCollapse: 'collapse',
-            ...(compact ? { fontSize: 'var(--hero-font-size-sm)' } : {})
-          }}
-        >
-          {caption && (
-            <caption>
-              <Text size="sm" color="foreground-muted">
-                {caption}
-              </Text>
-            </caption>
-          )}
-
-          {showHeader && (
-            <thead>
-              <tr>
-                {selectable && (
-                  <th style={{ padding: compact ? 'var(--hero-spacing-1)' : 'var(--hero-spacing-2)', borderBottom: '1px solid var(--hero-color-border)', textAlign: 'center' }}>
-                    <input
-                      type="checkbox"
-                      checked={selectedRows.length === tableData.length}
-                      onChange={handleSelectAll}
-                    />
-                  </th>
-                )}
-                 {columns.filter(col => visibleColumns.includes(col.accessor)).map((column, index) => (
-                  <th
-                    key={index}
-                    style={{
-                      textAlign: 'left',
-                      padding: compact ? 'var(--hero-spacing-1)' : 'var(--hero-spacing-2)',
-                      backgroundColor: hoveredCol === index ? '#f3f4f6' : 'var(--hero-color-muted)',
-                      borderBottom: '1px solid var(--hero-color-border)',
-                      cursor: column.sortable ? 'pointer' : 'default',
-                      ...(bordered ? { border: '1px solid var(--hero-color-border)' } : {}),
-                    }}
-                    tabIndex={column.sortable ? 0 : -1}
-                    onClick={() => column.sortable && handleSort(column)}
-                    onKeyDown={e => {
-                      if (column.sortable && (e.key === 'Enter' || e.key === ' ')) handleSort(column);
-                    }}
-                    aria-sort={sortColumn === column.accessor
-                      ? (sortDirection === 'asc' ? 'ascending' : 'descending')
-                      : 'none'}
-                    onMouseEnter={() => setHoveredCol(index)}
-                    onMouseLeave={() => setHoveredCol(null)}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                      <span>{column.header}</span>
-                      {column.sortable && (
-                        <span style={{ marginLeft: 8, display: 'flex', alignItems: 'center', color: sortColumn === column.accessor ? '#2563eb' : '#888' }}>
-                          {column.sortable && (
-                            sortColumn === column.accessor && sortDirection
-                              ? (sortDirection === 'asc' ? <ChevronDownIcon /> : <ChevronUpIcon />)
-                              : <SelectorIcon />
-                          )}
-                        </span>
-                      )}
-                    </div>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-          )}
-
-          <tbody>
-            {pagedData.map((row, rowIndex) => (
-              <tr
-                key={rowIndex}
-                style={{
-                  ...(striped && rowIndex % 2 === 1 ? { backgroundColor: 'var(--hero-color-muted-50)' } : {}),
-                  ...(hoverable ? { ':hover': { backgroundColor: 'var(--hero-color-muted-100)' } } : {})
-                }}
-              >
-                {selectable && (
-                  <td style={{
-                    padding: compact ? 'var(--hero-spacing-1)' : 'var(--hero-spacing-2)',
-                    textAlign: 'center',
-                    ...(bordered ? { border: '1px solid var(--hero-color-border)' } : { borderBottom: '1px solid var(--hero-color-border)' })
-                  }}>
-                    <input
-                      type="checkbox"
-                      checked={selectedRows.includes(row)}
-                      onChange={() => handleRowSelect(row)}
-                    />
-                  </td>
-                )}
-                {columns.filter(col => visibleColumns.includes(col.accessor)).map((column, colIndex) => (
-                  <td
-                    key={colIndex}
-                    style={{
-                      padding: compact ? 'var(--hero-spacing-1)' : 'var(--hero-spacing-2)',
-                      ...(bordered ? { border: '1px solid var(--hero-color-border)' } : {
-                        borderBottom: '1px solid var(--hero-color-border)'
-                      })
-                    }}
-                  >
-                    {column.cell ? column.cell(row) : row[column.accessor]}
-                  </td>
-                ))}
-              </tr>
-            ))}
-
-            {tableData.length === 0 && (
-              <tr>
-                <td
-                  colSpan={columns.length + (selectable ? 1 : 0)}
-                  style={{
-                    textAlign: 'center',
-                    padding: 'var(--hero-spacing-4)',
-                    color: 'var(--hero-color-foreground-muted)'
-                  }}
-                >
-                  No data to display
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+        {caption && (
+          <Text size="sm" color="foreground-muted" style={{ padding: compact ? 'var(--hero-spacing-1)' : 'var(--hero-spacing-2)' }}>
+            {caption}
+          </Text>
+        )}
+        <BaseTableBlock
+          key={`table-${sortColumn || 'none'}-${sortDirection || 'none'}`}
+          columns={baseColumns}
+          data={pagedData}
+          selectable={selectable}
+          multiSelect={multiSelect}
+          selectedRows={selectedRows}
+          onSelectionChange={handleSelectionChange}
+          sortColumn={sortColumn || undefined}
+          sortDirection={sortDirection}
+          onSortChange={handleSortChange}
+          className={compact ? 'text-sm' : undefined}
+        />
       </div>
       <div className="flex items-center mt-2 w-full">
         <div className="flex items-center bg-gray-100 rounded-full px-1 py-0.5 w-fit shadow-sm">

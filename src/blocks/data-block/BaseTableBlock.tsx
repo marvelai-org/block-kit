@@ -5,6 +5,8 @@ import {
   useRowSelect,
   Column,
   TableInstance,
+  HeaderProps,
+  CellProps,
 } from 'react-table';
 import { ChevronUpIcon, ChevronDownIcon, SelectorIcon } from '@heroui/shared-icons';
 
@@ -20,18 +22,16 @@ export interface BaseTableBlockProps<T> {
   data: T[];
   selectable?: boolean;
   multiSelect?: boolean;
-  selectedRows?: T[]; // controlled
+  selectedRows?: T[];
   onSelectionChange?: (selected: T[]) => void;
-  sortColumn?: string; // controlled
-  sortDirection?: 'asc' | 'desc' | null; // controlled
+  sortColumn?: string;
+  sortDirection?: 'asc' | 'desc' | null;
   onSortChange?: (col: string, dir: 'asc' | 'desc' | null) => void;
   className?: string;
   style?: React.CSSProperties;
-  // defaultSelectedRows removed (was unused)
 }
 
 function getRowId<T extends Record<string, any>>(row: T, idx: number): string {
-  // Try to use a unique key if possible
   return row.id ? String(row.id) : String(idx);
 }
 
@@ -48,51 +48,68 @@ export function BaseTableBlock<T extends Record<string, any>>({
   className,
   style,
 }: BaseTableBlockProps<T>) {
-  // Map BaseTableBlockColumn to react-table columns
+
+// ...rest of component
+
   const tableColumns: Column<T>[] = useMemo(() => {
+    // Local interfaces for selection-augmented types
+    interface RowSelectTableInstance {
+      getToggleAllRowsSelectedProps: () => React.InputHTMLAttributes<HTMLInputElement> & { indeterminate?: boolean };
+      toggleAllRowsSelected: (selected: boolean) => void;
+    }
+    interface RowSelectRow {
+      getToggleRowSelectedProps: () => React.InputHTMLAttributes<HTMLInputElement> & { indeterminate?: boolean };
+      toggleRowSelected: (selected: boolean) => void;
+      isSelected?: boolean;
+      original: T;
+      index: number;
+      table?: RowSelectTableInstance;
+      _getInstance?: () => RowSelectTableInstance;
+    }
+
+    function SelectionHeader(headerProps: HeaderProps<T>) {
+      const headerWithSelect = headerProps as unknown as RowSelectTableInstance;
+      const { indeterminate, ...rest } = headerWithSelect.getToggleAllRowsSelectedProps();
+      return (
+        <input
+          type="checkbox"
+          aria-label="select all"
+          {...rest}
+          tabIndex={0}
+          ref={el => { if (el) el.indeterminate = !!indeterminate; }}
+        />
+      );
+    }
+
+    function SelectionCell(cellProps: CellProps<T>) {
+      const row = cellProps.row as unknown as RowSelectRow;
+      const { indeterminate, onChange, ...rest } = row.getToggleRowSelectedProps ? row.getToggleRowSelectedProps() : {};
+      const instance = row.table || row._getInstance?.();
+      const isSelected = row.isSelected ?? false;
+      const handleChange = multiSelect ? onChange : () => {
+        if (instance?.toggleAllRowsSelected) instance.toggleAllRowsSelected(false);
+        if (row.toggleRowSelected) row.toggleRowSelected(true);
+        onSelectionChange?.([row.original]);
+      };
+      return (
+        <input
+          type="checkbox"
+          aria-label={`select row ${row.index + 1}`}
+          checked={isSelected}
+          tabIndex={0}
+          {...rest}
+          ref={el => { if (el) el.indeterminate = !!indeterminate; }}
+          onChange={handleChange}
+        />
+      );
+    }
+
     const cols: Column<T>[] = [];
     if (selectable) {
       cols.push({
         id: 'selection',
-        Header: function SelectionHeader({ getToggleAllRowsSelectedProps }: { getToggleAllRowsSelectedProps: () => any }) {
-          // Only spread indeterminate if true to avoid React warning
-          const props = getToggleAllRowsSelectedProps();
-          const { indeterminate, ...rest } = props;
-          return multiSelect ? (
-            <input
-              type="checkbox"
-              aria-label="select all"
-              {...rest}
-              {...(indeterminate ? { indeterminate } : {})}
-              tabIndex={0}
-            />
-          ) : null;
-        },
-        Cell: (cellProps: { row: import('react-table').Row<T> }) => {
-          const { row } = cellProps;
-          const rowSelectProps = row.getToggleRowSelectedProps ? row.getToggleRowSelectedProps() : {};
-          const { indeterminate, onChange, ...rest } = rowSelectProps;
-          // In single-select mode, override onChange to ensure only one row is selected
-          const instance = row.table || row._getInstance?.(); // fallback for react-table v7
-          return (
-            <input
-              type="checkbox"
-              aria-label={`select row ${row.index + 1}`}
-              checked={!!row.isSelected}
-              tabIndex={0}
-              {...rest}
-              {...(indeterminate ? { indeterminate } : {})}
-              onChange={multiSelect ? onChange : (() => {
-                if (instance?.toggleAllRowsSelected) instance.toggleAllRowsSelected(false);
-                if (row.toggleRowSelected) row.toggleRowSelected(true);
-                // Call onSelectionChange immediately with only this row
-                if (typeof onSelectionChange === 'function') {
-                  onSelectionChange([row.original]);
-                }
-              })}
-            />
-          );
-        },
+        Header: SelectionHeader,
+        Cell: SelectionCell,
         disableSortBy: true,
         width: 40,
       } as Column<T>);
@@ -107,7 +124,6 @@ export function BaseTableBlock<T extends Record<string, any>>({
           Cell: col.cell
             ? ({ row }: { row: { original: T } }) => col.cell!(row.original)
             : ({ value, row }: { value: any, row: { original: T } }) => {
-                // Fallback to raw value from row data if value is undefined
                 const accessor = col.accessor as keyof T;
                 return value !== undefined ? value : row.original[accessor];
               },
@@ -115,9 +131,8 @@ export function BaseTableBlock<T extends Record<string, any>>({
       })
     );
     return cols;
-  }, [columns, selectable, multiSelect]);
+  }, [columns, selectable, multiSelect, onSelectionChange]);
 
-  // Controlled/uncontrolled selection state
   const isControlledSelection = selectedRows !== undefined;
   const selectedRowIds = useMemo(() => {
     if (!isControlledSelection || !selectedRows) return undefined;
@@ -131,7 +146,6 @@ export function BaseTableBlock<T extends Record<string, any>>({
     }, {} as Record<string, boolean>);
   }, [selectedRows, data, isControlledSelection]);
 
-  // Controlled/uncontrolled sorting
   const isControlledSort = sortColumn !== undefined && sortDirection !== undefined;
   const initialState: any = {};
   if (isControlledSort && sortColumn) {
@@ -166,17 +180,11 @@ export function BaseTableBlock<T extends Record<string, any>>({
     prepareRow,
     selectedFlatRows,
     state: tableState,
-    toggleAllRowsSelected,
-    toggleRowSelected,
   } = instance as TableInstance<T> & {
-    toggleAllRowsSelected: (value?: boolean) => void;
-    toggleRowSelected: (rowId: string, value?: boolean) => void;
     selectedFlatRows: { original: T }[];
   };
 
-  // Selection effect
   useEffect(() => {
-    // Only call onSelectionChange from effect in multi-select mode
     if (multiSelect && onSelectionChange) {
       if (isControlledSelection) {
         onSelectionChange(selectedRows || []);
@@ -184,18 +192,17 @@ export function BaseTableBlock<T extends Record<string, any>>({
         onSelectionChange(selectedFlatRows.map((r) => r.original));
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [multiSelect, selectedFlatRows, onSelectionChange]);
+  }, [multiSelect, selectedFlatRows, onSelectionChange, isControlledSelection, selectedRows]);
 
-  // Sorting effect
   useEffect(() => {
+    const sortingState = tableState as typeof tableState & { sortBy?: Array<{ id: string; desc: boolean }> };
     if (
       isControlledSort &&
       onSortChange &&
-      tableState.sortBy &&
-      tableState.sortBy.length > 0
+      sortingState.sortBy &&
+      sortingState.sortBy.length > 0
     ) {
-      const sort = tableState.sortBy[0];
+      const sort = sortingState.sortBy[0];
       const dir = sort.desc ? 'desc' : 'asc';
       if (
         sort.id !== sortColumn ||
@@ -204,8 +211,7 @@ export function BaseTableBlock<T extends Record<string, any>>({
         onSortChange(sort.id, dir);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tableState.sortBy, onSortChange]);
+  }, [tableState, isControlledSort, sortColumn, sortDirection, onSortChange]);
 
   return (
     <div style={style}>
