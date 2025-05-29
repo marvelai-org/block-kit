@@ -186,4 +186,94 @@ describe('TableBlock', () => {
       expect(ageSortItem.querySelector('svg[data-icon="heroicons-outline:arrow-down"]')).toBeInTheDocument();
     });
   });
+
+  describe('Columns Menu Functionality', () => {
+    beforeEach(() => {
+      render(<TableBlock id="test-table" columns={columns} data={data} />);
+      const columnsButton = screen.getByRole('button', { name: /Columns/i });
+      fireEvent.click(columnsButton); // Open the columns menu
+    });
+
+    it('opens and displays all columns with checkmarks initially', () => {
+      // Menu is opened in beforeEach
+      const nameItem = screen.getByRole('menuitemcheckbox', { name: 'Name' });
+      const ageItem = screen.getByRole('menuitemcheckbox', { name: 'Age' });
+      const statusItem = screen.getByRole('menuitemcheckbox', { name: 'Status' });
+
+      expect(nameItem).toBeInTheDocument();
+      expect(ageItem).toBeInTheDocument();
+      expect(statusItem).toBeInTheDocument();
+
+      expect(nameItem).toHaveAttribute('aria-checked', 'true');
+      expect(nameItem.querySelector('svg[data-icon="heroicons-outline:check"]')).toBeInTheDocument();
+      expect(ageItem).toHaveAttribute('aria-checked', 'true');
+      expect(ageItem.querySelector('svg[data-icon="heroicons-outline:check"]')).toBeInTheDocument();
+      expect(statusItem).toHaveAttribute('aria-checked', 'true');
+      expect(statusItem.querySelector('svg[data-icon="heroicons-outline:check"]')).toBeInTheDocument();
+
+      // Check table headers
+      expect(screen.getByRole('columnheader', { name: 'Name' })).toBeInTheDocument();
+      expect(screen.getByRole('columnheader', { name: 'Age' })).toBeInTheDocument();
+      expect(screen.getByRole('columnheader', { name: 'Status' })).toBeInTheDocument();
+    });
+
+    it('toggles column visibility (Status) and menu stays open', async () => {
+      const statusItem = screen.getByRole('menuitemcheckbox', { name: 'Status' });
+
+      // 1. Hide 'Status'
+      fireEvent.click(statusItem);
+      expect(screen.getByRole('button', { name: /Columns/i })).toBeInTheDocument(); // Menu button still there, implies menu might be open
+      expect(statusItem).toHaveAttribute('aria-checked', 'false');
+      expect(statusItem.querySelector('svg[data-icon="heroicons-outline:check"]')).not.toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.queryByRole('columnheader', { name: 'Status' })).not.toBeInTheDocument();
+      });
+      expect(screen.getByRole('columnheader', { name: 'Name' })).toBeInTheDocument(); // Other columns still visible
+
+      // 2. Show 'Status' again
+      fireEvent.click(statusItem);
+      expect(statusItem).toHaveAttribute('aria-checked', 'true');
+      expect(statusItem.querySelector('svg[data-icon="heroicons-outline:check"]')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByRole('columnheader', { name: 'Status' })).toBeInTheDocument();
+      });
+    });
+
+    it('toggles multiple columns and menu stays open', async () => {
+      const ageItem = screen.getByRole('menuitemcheckbox', { name: 'Age' });
+      const statusItem = screen.getByRole('menuitemcheckbox', { name: 'Status' });
+
+      // Hide Age
+      fireEvent.click(ageItem);
+      expect(ageItem).toHaveAttribute('aria-checked', 'false');
+      await waitFor(() => expect(screen.queryByRole('columnheader', { name: 'Age' })).not.toBeInTheDocument());
+
+      // Menu should still be open, hide Status
+      expect(screen.getByRole('menuitemcheckbox', { name: 'Status' })).toBeInTheDocument(); // Check if statusItem is still in DOM (menu open)
+      fireEvent.click(statusItem);
+      expect(statusItem).toHaveAttribute('aria-checked', 'false');
+      await waitFor(() => expect(screen.queryByRole('columnheader', { name: 'Status' })).not.toBeInTheDocument());
+
+      // Name should still be visible
+      const nameItem = screen.getByRole('menuitemcheckbox', { name: 'Name' });
+      expect(nameItem).toHaveAttribute('aria-checked', 'true');
+      expect(screen.getByRole('columnheader', { name: 'Name' })).toBeInTheDocument();
+    });
+
+    it('toggles column visibility with keyboard (Enter and Space)', async () => {
+      const ageItem = screen.getByRole('menuitemcheckbox', { name: 'Age' });
+
+      // Hide 'Age' with Enter
+      fireEvent.keyDown(ageItem, { key: 'Enter', code: 'Enter' });
+      expect(ageItem).toHaveAttribute('aria-checked', 'false');
+      await waitFor(() => expect(screen.queryByRole('columnheader', { name: 'Age' })).not.toBeInTheDocument());
+      // Menu should still be open
+      expect(screen.getByRole('menuitemcheckbox', { name: 'Name' })).toBeInTheDocument();
+
+      // Show 'Age' again with Space
+      fireEvent.keyDown(ageItem, { key: ' ', code: 'Space' });
+      expect(ageItem).toHaveAttribute('aria-checked', 'true');
+      await waitFor(() => expect(screen.getByRole('columnheader', { name: 'Age' })).toBeInTheDocument());
+    });
+  });
 });

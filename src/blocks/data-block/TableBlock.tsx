@@ -82,14 +82,12 @@ export const TableBlock: React.FC<TableBlockProps> = ({
     setVisibleColumns(columns.map(c => c.accessor));
   }, [columns]);
   const toggleColumn = (accessor: string) => {
-    setVisibleColumns(cols =>
-      cols.includes(accessor)
-        ? cols.filter(a => a !== accessor)
-        : [...cols, accessor]
+    setVisibleColumns(prevVisibleColumns =>
+      prevVisibleColumns.includes(accessor)
+        ? prevVisibleColumns.filter(a => a !== accessor)
+        : [...prevVisibleColumns, accessor]
     );
   };
-  const showAllColumns = () => setVisibleColumns(columns.map(c => c.accessor));
-  const hideAllColumns = () => setVisibleColumns([]);
 
   // Use pageNumber from props for initial state, but let BaseTableBlock handle the pagination
   const [selectedRows, setSelectedRows] = React.useState<TableRowData[]>([]);
@@ -277,7 +275,7 @@ export const TableBlock: React.FC<TableBlockProps> = ({
               aria-controls="columns-dropdown"
               onClick={() => setOpenDropdown(openDropdown === "columns" ? null : "columns")}
             >
-              <Icon icon="heroicons-outline:view-grid" className="w-4 h-4 mr-1" />Columns
+              <Icon icon="heroicons-outline:arrows-right-left" className="w-4 h-4 mr-1" />Columns
             </Button>
             {openDropdown === "columns" && (
               <div
@@ -286,41 +284,48 @@ export const TableBlock: React.FC<TableBlockProps> = ({
                 ref={columnsDropdownRef}
                 style={{
                   position: 'absolute',
-                  top: '110%',
+                  top: '100%', // Adjusted top to align with sort menu
                   left: 0,
-                  zIndex: 10,
+                  marginTop: 4, // Added margin to align with sort menu
                   background: '#fff',
                   border: '1px solid #e5e7eb',
-                  borderRadius: 8,
-                  boxShadow: '0 2px 8px 0 rgba(0,0,0,0.08)',
-                  padding: 12,
+                  borderRadius: 6, // Matched sort menu
+                  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)', // Matched sort menu
+                  zIndex: 10,
+                  padding: 'var(--hero-spacing-1)', // Matched sort menu
                   minWidth: 180
                 }}
               >
-                <div style={{ fontWeight: 500, marginBottom: 8 }}>Columns</div>
                 {columns.map(col => (
-                  <label key={col.accessor} style={{ display: 'block', marginBottom: 6, cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={visibleColumns.includes(col.accessor)}
-                      onChange={() => toggleColumn(col.accessor)}
-                      style={{ marginRight: 8 }}
-                    />
+                  <div
+                    key={col.accessor}
+                    role="menuitemcheckbox"
+                    aria-checked={visibleColumns.includes(col.accessor)}
+                    tabIndex={0}
+                    onClick={() => toggleColumn(col.accessor)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        toggleColumn(col.accessor);
+                      }
+                    }}
+                    style={{
+                      padding: '6px 12px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      borderRadius: 4,
+                      backgroundColor: 'transparent', // Base background
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f9fafb')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                  >
                     {col.header}
-                  </label>
+                    {visibleColumns.includes(col.accessor) && 
+                      <Icon icon="heroicons-outline:check" className="w-4 h-4 text-blue-600" />}
+                  </div>
                 ))}
-                <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
-                  <button
-                    type="button"
-                    style={{ padding: '4px 12px', borderRadius: 4, border: '1px solid #e5e7eb', background: '#f9fafb', cursor: 'pointer' }}
-                    onClick={showAllColumns}
-                  >Show All</button>
-                  <button
-                    type="button"
-                    style={{ padding: '4px 12px', borderRadius: 4, border: '1px solid #e5e7eb', background: '#f9fafb', cursor: 'pointer' }}
-                    onClick={hideAllColumns}
-                  >Hide All</button>
-                </div>
               </div>
             )}
           </div>
