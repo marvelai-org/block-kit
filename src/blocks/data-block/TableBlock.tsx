@@ -91,7 +91,7 @@ export const TableBlock: React.FC<TableBlockProps> = ({
   const showAllColumns = () => setVisibleColumns(columns.map(c => c.accessor));
   const hideAllColumns = () => setVisibleColumns([]);
 
-  const [currentPage, setCurrentPage] = React.useState<number>(pageNumber);
+  // Use pageNumber from props for initial state, but let BaseTableBlock handle the pagination
   const [selectedRows, setSelectedRows] = React.useState<TableRowData[]>([]);
   const [searchTerm, setSearchTerm] = React.useState<string>('');
 
@@ -133,27 +133,10 @@ export const TableBlock: React.FC<TableBlockProps> = ({
 
   React.useEffect(() => {
     setTableData(sortedData);
-    setCurrentPage(1);
+    // Page will reset automatically in BaseTableBlock when data changes
   }, [sortedData]);
 
-  const totalPages = React.useMemo(() => Math.max(1, Math.ceil(tableData.length / pageSize)), [tableData, pageSize]);
-
-  function getPageNumbers(currentPage: number, totalPages: number): (number | 'ellipsis')[] {
-    let startPage = Math.max(1, currentPage - 2);
-    let endPage = Math.min(totalPages, currentPage + 2);
-    if (currentPage <= 3) { startPage = 1; endPage = Math.min(5, totalPages); }
-    if (currentPage >= totalPages - 2) { endPage = totalPages; startPage = Math.max(1, totalPages - 4); }
-    const pageNumbers: (number | 'ellipsis')[] = [];
-    pageNumbers.push(1);
-    if (startPage > 2) pageNumbers.push('ellipsis');
-    for (let p = startPage; p <= endPage; p++) if (p !== 1 && p !== totalPages) pageNumbers.push(p);
-    if (endPage < totalPages - 1) pageNumbers.push('ellipsis');
-    if (totalPages > 1) pageNumbers.push(totalPages);
-    return pageNumbers;
-  }
-
-  const pageNumbers = getPageNumbers(currentPage, totalPages);
-  const pagedData = tableData.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  // Pagination is now handled by BaseTableBlock
 
   const baseColumns: BaseTableBlockColumn<TableRowData>[] = columns
     .filter(c => visibleColumns.includes(c.accessor))
@@ -373,7 +356,7 @@ export const TableBlock: React.FC<TableBlockProps> = ({
         <BaseTableBlock
           key={`table-${sortColumn || 'none'}-${sortDirection || 'none'}`}
           columns={baseColumns}
-          data={pagedData}
+          data={tableData}
           selectable={selectable}
           multiSelect={multiSelect}
           selectedRows={selectedRows}
@@ -382,71 +365,12 @@ export const TableBlock: React.FC<TableBlockProps> = ({
           sortDirection={sortDirection}
           onSortChange={handleSortChange}
           className={compact ? 'text-sm' : undefined}
+          pageSize={pageSize}
+          pageNumber={pageNumber}
+          showPagination={true}
         />
       </div>
-      <div className="flex items-center mt-2 w-full">
-        <div className="flex items-center bg-gray-100 rounded-full px-1 py-0.5 w-fit shadow-sm">
-          <button
-            onClick={() => setCurrentPage(1)}
-            disabled={currentPage === 1}
-            className="mx-0.5 w-7 h-7 flex items-center justify-center rounded-full border border-transparent disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none hover:bg-gray-200 text-base"
-            aria-label="First page"
-          >
-            &laquo;
-          </button>
-          <button
-            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-            disabled={currentPage === 1}
-            className="mx-0.5 w-7 h-7 flex items-center justify-center rounded-full border border-transparent disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none hover:bg-gray-200 text-base"
-            aria-label="Previous page"
-          >
-            &lsaquo;
-          </button>
-          {pageNumbers.map((item, idx) =>
-            item === 'ellipsis' ? (
-              <span key={idx} className="mx-0.5 w-7 h-7 flex items-center justify-center select-none text-base">...</span>
-            ) : (
-              <button
-                key={idx}
-                onClick={() => setCurrentPage(item as number)}
-                disabled={item === currentPage}
-                className={[
-                  "mx-0.5 w-7 h-7 flex items-center justify-center rounded-full border border-transparent transition-all duration-150",
-                  item === currentPage
-                    ? "font-bold bg-blue-500 text-white shadow-[0_2px_8px_rgba(0,119,255,0.15)] outline-none"
-                    : "hover:bg-gray-200 hover:border-gray-300 text-black",
-                  "disabled:bg-blue-500 disabled:text-white disabled:font-bold disabled:cursor-default"
-                ].join(" ")}
-                aria-current={item === currentPage ? 'page' : undefined}
-                style={item === currentPage ? { boxShadow: '0 2px 8px 0 rgba(0,119,255,0.15)' } : {}}
-              >
-                {item}
-              </button>
-            )
-          )}
-        </div>
-        <div className="flex ml-auto gap-2">
-          {selectable && (
-            <div className="ml-4">
-              <Text size="sm"><strong>{selectedRows.length}</strong> of <strong>{tableData.length}</strong> selected</Text>
-            </div>
-          )}
-          <button
-            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-            disabled={currentPage === 1}
-            className="w-20 h-7 flex items-center justify-center rounded-full border border-gray-300 text-gray-700 bg-white text-sm hover:bg-gray-50 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            Previous
-          </button>
-          <button
-            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-            disabled={currentPage === totalPages}
-            className="w-20 h-7 flex items-center justify-center rounded-full border border-gray-300 text-gray-700 bg-white text-sm hover:bg-gray-50 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            Next
-          </button>
-        </div>
-      </div>
+      {/* Pagination is now handled by BaseTableBlock */}
     </Card>
   );
 };

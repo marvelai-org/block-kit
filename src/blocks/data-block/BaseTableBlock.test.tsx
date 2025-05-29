@@ -197,3 +197,198 @@ describe('BaseTableBlock', () => {
     expect(rows[3]).toHaveTextContent('Charlie');
   });
 });
+
+describe('BaseTableBlock Pagination', () => {
+  const manyRows: RowData[] = Array.from({ length: 25 }, (_, i) => ({
+    name: `Person ${i + 1}`,
+    age: 20 + i,
+    status: i % 2 === 0 ? 'Active' : 'Inactive'
+  }));
+
+  it('renders without pagination by default', () => {
+    render(
+      <BaseTableBlock
+        columns={columns}
+        data={manyRows}
+      />
+    );
+    
+    // All rows should be rendered
+    expect(screen.getAllByRole('row').length).toBe(manyRows.length + 1); // +1 for header row
+    expect(screen.queryByLabelText('First page')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Previous page')).not.toBeInTheDocument();
+    expect(screen.queryByText('Next')).not.toBeInTheDocument();
+  });
+
+  it('renders with pagination when showPagination is true', () => {
+    render(
+      <BaseTableBlock
+        columns={columns}
+        data={manyRows}
+        pageSize={10}
+        showPagination={true}
+      />
+    );
+    
+    // Only first page of rows should be rendered (10 rows + 1 header)
+    expect(screen.getAllByRole('row').length).toBe(11);
+    
+    // Pagination controls should be visible
+    expect(screen.getByLabelText('First page')).toBeInTheDocument();
+    expect(screen.getByLabelText('Previous page')).toBeInTheDocument();
+    expect(screen.getByText('Next')).toBeInTheDocument();
+  });
+
+  it('changes page when pagination controls are clicked', () => {
+    render(
+      <BaseTableBlock
+        columns={columns}
+        data={manyRows}
+        pageSize={5}
+        showPagination={true}
+      />
+    );
+    
+    // First page should show first 5 rows
+    expect(screen.getByText('Person 1')).toBeInTheDocument();
+    expect(screen.getByText('Person 5')).toBeInTheDocument();
+    expect(screen.queryByText('Person 6')).not.toBeInTheDocument();
+    
+    // Click Next button
+    fireEvent.click(screen.getByText('Next'));
+    
+    // Second page should show next 5 rows
+    expect(screen.queryByText('Person 1')).not.toBeInTheDocument();
+    expect(screen.getByText('Person 6')).toBeInTheDocument();
+    expect(screen.getByText('Person 10')).toBeInTheDocument();
+    
+    // Click on page 3
+    fireEvent.click(screen.getByText('3'));
+    
+    // Third page should show rows 11-15
+    expect(screen.queryByText('Person 6')).not.toBeInTheDocument();
+    expect(screen.getByText('Person 11')).toBeInTheDocument();
+    expect(screen.getByText('Person 15')).toBeInTheDocument();
+    
+    // Click First page button
+    fireEvent.click(screen.getByLabelText('First page'));
+    
+    // Should go back to first page
+    expect(screen.getByText('Person 1')).toBeInTheDocument();
+    expect(screen.queryByText('Person 11')).not.toBeInTheDocument();
+  });
+
+  it('disables pagination buttons appropriately', () => {
+    render(
+      <BaseTableBlock
+        columns={columns}
+        data={manyRows}
+        pageSize={10}
+        showPagination={true}
+      />
+    );
+    
+    // On first page, Previous and First buttons should be disabled
+    expect(screen.getByLabelText('First page')).toBeDisabled();
+    expect(screen.getByLabelText('Previous page')).toBeDisabled();
+    expect(screen.getByText('Next')).not.toBeDisabled();
+    
+    // Go to last page
+    fireEvent.click(screen.getByText('3')); // Last page with 10 items per page and 25 total items
+    
+    // On last page, Next button should be disabled
+    expect(screen.getByLabelText('First page')).not.toBeDisabled();
+    expect(screen.getByLabelText('Previous page')).not.toBeDisabled();
+    expect(screen.getByText('Next')).toBeDisabled();
+  });
+
+  it('calls onPageChange when page changes', () => {
+    const onPageChange = vi.fn();
+    render(
+      <BaseTableBlock
+        columns={columns}
+        data={manyRows}
+        pageSize={10}
+        showPagination={true}
+        onPageChange={onPageChange}
+      />
+    );
+    
+    // Click Next button
+    fireEvent.click(screen.getByText('Next'));
+    expect(onPageChange).toHaveBeenCalledWith(2);
+    
+    // Click on page 3
+    fireEvent.click(screen.getByText('3'));
+    expect(onPageChange).toHaveBeenCalledWith(3);
+    
+    // Click Previous button
+    fireEvent.click(screen.getByText('Previous'));
+    expect(onPageChange).toHaveBeenCalledWith(2);
+  });
+
+  it('handles page size correctly', () => {
+    const { rerender } = render(
+      <BaseTableBlock
+        columns={columns}
+        data={manyRows}
+        pageSize={5}
+        showPagination={true}
+      />
+    );
+    
+    // With pageSize=5, should have 5 rows + header
+    expect(screen.getAllByRole('row').length).toBe(6);
+    
+    // Should have 5 pages (25 items / 5 per page = 5 pages)
+    expect(screen.getByText('5')).toBeInTheDocument();
+    
+    // Rerender with different page size
+    rerender(
+      <BaseTableBlock
+        columns={columns}
+        data={manyRows}
+        pageSize={10}
+        showPagination={true}
+      />
+    );
+    
+    // With pageSize=10, should have 10 rows + header
+    expect(screen.getAllByRole('row').length).toBe(11);
+    
+    // Should have 3 pages (25 items / 10 per page = 3 pages)
+    expect(screen.getByText('3')).toBeInTheDocument();
+    expect(screen.queryByText('5')).not.toBeInTheDocument();
+  });
+
+  it('handles controlled pagination with pageNumber prop', () => {
+    const { rerender } = render(
+      <BaseTableBlock
+        columns={columns}
+        data={manyRows}
+        pageSize={5}
+        pageNumber={1}
+        showPagination={true}
+      />
+    );
+    
+    // First page should show first 5 rows
+    expect(screen.getByText('Person 1')).toBeInTheDocument();
+    expect(screen.queryByText('Person 6')).not.toBeInTheDocument();
+    
+    // Update pageNumber prop
+    rerender(
+      <BaseTableBlock
+        columns={columns}
+        data={manyRows}
+        pageSize={5}
+        pageNumber={2}
+        showPagination={true}
+      />
+    );
+    
+    // Second page should show next 5 rows
+    expect(screen.queryByText('Person 1')).not.toBeInTheDocument();
+    expect(screen.getByText('Person 6')).toBeInTheDocument();
+  });
+});

@@ -9,6 +9,7 @@ import {
   CellProps,
 } from 'react-table';
 import { ChevronUpIcon, ChevronDownIcon, SelectorIcon } from '@heroui/shared-icons';
+import { PageNumbers } from '../../components/Pagination';
 
 export interface BaseTableBlockColumn<T> {
   header: React.ReactNode;
@@ -29,6 +30,11 @@ export interface BaseTableBlockProps<T> {
   onSortChange?: (col: string, dir: 'asc' | 'desc' | null) => void;
   className?: string;
   style?: React.CSSProperties;
+  // Pagination props
+  pageSize?: number;
+  pageNumber?: number;
+  onPageChange?: (page: number) => void;
+  showPagination?: boolean;
 }
 
 function getRowId<T extends Record<string, any>>(row: T, idx: number): string {
@@ -47,6 +53,10 @@ export function BaseTableBlock<T extends Record<string, any>>({
   onSortChange,
   className,
   style,
+  pageSize = 10,
+  pageNumber = 1,
+  onPageChange,
+  showPagination = false,
 }: BaseTableBlockProps<T>) {
 
 // ...rest of component
@@ -213,6 +223,38 @@ export function BaseTableBlock<T extends Record<string, any>>({
     }
   }, [tableState, isControlledSort, sortColumn, sortDirection, onSortChange]);
 
+  // Pagination logic
+  const [currentPage, setCurrentPage] = React.useState<number>(pageNumber);
+
+  // Update current page when pageNumber prop changes
+  useEffect(() => {
+    setCurrentPage(pageNumber);
+  }, [pageNumber]);
+
+  // Calculate total pages and paginated data
+  const totalPages = useMemo(() =>
+    Math.max(1, Math.ceil(data.length / pageSize)),
+    [data.length, pageSize]
+  );
+
+  // Get displayed rows based on pagination
+  const displayedRows = useMemo(() => {
+    if (!showPagination) return rows;
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = Math.min(startIndex + pageSize, rows.length);
+    return rows.slice(startIndex, endIndex);
+  }, [rows, currentPage, pageSize, showPagination]);
+
+  // Pagination logic is now handled by the Pagination component
+
+  // Handle page change
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    if (onPageChange) {
+      onPageChange(page);
+    }
+  };
+
   return (
     <div style={style}>
       <table className={className} style={{ width: '100%' }} {...getTableProps()} role="table">
@@ -267,7 +309,7 @@ export function BaseTableBlock<T extends Record<string, any>>({
           ))}
         </thead>
         <tbody {...getTableBodyProps()}>
-          {rows.map((row, rowIdx) => {
+          {displayedRows.map((row, rowIdx) => {
             prepareRow(row);
             return (
               <tr {...row.getRowProps()} key={rowIdx}>
@@ -281,6 +323,46 @@ export function BaseTableBlock<T extends Record<string, any>>({
           })}
         </tbody>
       </table>
+
+      <div className="flex items-center mt-2 w-full">
+        {showPagination && totalPages > 1 && (
+          <div className="flex">
+            <PageNumbers
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={handlePageChange}
+            />
+          </div>
+        )}
+        <div className="flex ml-auto items-center gap-2">
+          {selectable && (
+            <div className="flex items-center">
+              <span className="text-sm">
+                <strong>{selectedFlatRows.length}</strong> of <strong>{data.length}</strong> selected
+              </span>
+            </div>
+          )}
+
+          {showPagination && totalPages > 1 && (
+            <>
+              <button
+                onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+                className="w-20 h-7 flex items-center justify-center rounded-full border border-gray-300 text-gray-700 bg-white text-sm hover:bg-gray-50 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
+                disabled={currentPage === totalPages}
+                className="w-20 h-7 flex items-center justify-center rounded-full border border-gray-300 text-gray-700 bg-white text-sm hover:bg-gray-50 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
