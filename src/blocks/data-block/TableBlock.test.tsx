@@ -1,5 +1,12 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// Mock @iconify/react
+vi.mock('@iconify/react', () => ({
+  Icon: ({ icon, className }: { icon: string; className: string }) => (
+    <svg data-icon={icon} className={className} />
+  ),
+}));
 import { TableBlock, TableColumn, TableRowData } from './TableBlock';
 
 const columns: TableColumn[] = [
@@ -67,30 +74,116 @@ describe('TableBlock', () => {
     expect(screen.getAllByRole('button', { name: 'edit' })[0]).toBeInTheDocument();
   });
 
-  it('sorts data via sort menu', async () => {
-    render(<TableBlock id="test-table" columns={columns} data={data} />);
-    fireEvent.click(screen.getByRole('button', { name: /Sort/i }));
-    fireEvent.click(screen.getByLabelText('Age'));
-    await waitFor(() => {
-      const ascRows = screen.getAllByRole('row');
-      expect(ascRows[1]).toHaveTextContent('Bob');
-      expect(ascRows[2]).toHaveTextContent('Alice');
-      expect(ascRows[3]).toHaveTextContent('Charlie');
+  describe('Sort Menu Functionality', () => {
+    beforeEach(() => {
+      render(<TableBlock id="test-table" columns={columns} data={data} />);
+      const sortButton = screen.getByRole('button', { name: /Sort/i });
+      fireEvent.click(sortButton); // Open the sort menu
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Desc' }));
-    await waitFor(() => {
-      const descRows = screen.getAllByRole('row');
-      expect(descRows[1]).toHaveTextContent('Charlie');
-      expect(descRows[2]).toHaveTextContent('Alice');
-      expect(descRows[3]).toHaveTextContent('Bob');
+
+    it('opens and displays only sortable columns', () => {
+      // Menu is opened in beforeEach
+      expect(screen.getByRole('button', { name: 'Name' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Age' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Status' })).not.toBeInTheDocument();
     });
-    fireEvent.click(screen.getByLabelText('Name'));
-    fireEvent.click(screen.getByRole('button', { name: 'Asc' }));
-    await waitFor(() => {
-      const nameRows = screen.getAllByRole('row');
-      expect(nameRows[1]).toHaveTextContent('Alice');
-      expect(nameRows[2]).toHaveTextContent('Bob');
-      expect(nameRows[3]).toHaveTextContent('Charlie');
+
+    it('sorts by a column (Name) in ascending, then descending, then clears sort', async () => {
+      // Menu is open from beforeEach
+      let nameSortItem = screen.getByRole('button', { name: 'Name' });
+
+      // 1. Sort Ascending by Name
+      fireEvent.click(nameSortItem); // Closes menu
+      await waitFor(() => { // Wait for table rows to update
+        const rows = screen.getAllByRole('row');
+        expect(rows[1]).toHaveTextContent('Alice');
+        expect(rows[2]).toHaveTextContent('Bob');
+        expect(rows[3]).toHaveTextContent('Charlie');
+      });
+      fireEvent.click(screen.getByRole('button', { name: /Sort/i })); // Re-open menu
+      nameSortItem = screen.getByRole('button', { name: 'Name' }); // Re-fetch item
+      expect(nameSortItem.querySelector('svg[data-icon="heroicons-outline:arrow-up"]')).toBeInTheDocument();
+
+      // 2. Sort Descending by Name (Menu is currently open, nameSortItem is fresh)
+      fireEvent.click(nameSortItem); // Closes menu
+      await waitFor(() => { // Wait for table rows to update
+        const rows = screen.getAllByRole('row');
+        expect(rows[1]).toHaveTextContent('Charlie');
+        expect(rows[2]).toHaveTextContent('Bob');
+        expect(rows[3]).toHaveTextContent('Alice');
+      });
+      fireEvent.click(screen.getByRole('button', { name: /Sort/i })); // Re-open menu
+      nameSortItem = screen.getByRole('button', { name: 'Name' }); // Re-fetch item
+      expect(nameSortItem.querySelector('svg[data-icon="heroicons-outline:arrow-down"]')).toBeInTheDocument();
+      
+      // 3. Clear Sort for Name (Menu is currently open, nameSortItem is fresh)
+      fireEvent.click(nameSortItem); // Closes menu
+      await waitFor(() => { // Wait for table rows to update
+        const rows = screen.getAllByRole('row');
+        expect(rows[1]).toHaveTextContent('Alice');
+        expect(rows[2]).toHaveTextContent('Bob');
+        expect(rows[3]).toHaveTextContent('Charlie');
+      });
+      fireEvent.click(screen.getByRole('button', { name: /Sort/i })); // Re-open menu
+      nameSortItem = screen.getByRole('button', { name: 'Name' }); // Re-fetch item
+      expect(nameSortItem.querySelector('svg[data-icon="heroicons-outline:arrow-up"]')).not.toBeInTheDocument();
+      expect(nameSortItem.querySelector('svg[data-icon="heroicons-outline:arrow-down"]')).not.toBeInTheDocument();
+    });
+
+    it('switches sort to a different column (Age) correctly', async () => {
+      // Menu is open from beforeEach
+      const nameSortItem = screen.getByRole('button', { name: 'Name' });
+      
+      // First, sort by Name ASC to establish an initial sort state
+      fireEvent.click(nameSortItem); // Closes menu
+      await waitFor(() => { // Wait for table rows to update
+        expect(screen.getAllByRole('row')[1]).toHaveTextContent('Alice');
+      });
+      // Re-open menu to check/continue
+      fireEvent.click(screen.getByRole('button', { name: /Sort/i })); 
+      // nameSortItem needs to be re-fetched if we were to check its icon, but we are switching columns.
+
+      // Now sort by Age ASC (Menu is currently open)
+      const ageSortItem = screen.getByRole('button', { name: 'Age' });
+      fireEvent.click(ageSortItem); // Closes menu
+      await waitFor(() => { // Wait for table rows to update
+        const rows = screen.getAllByRole('row');
+        expect(rows[1]).toHaveTextContent('Bob');
+        expect(rows[2]).toHaveTextContent('Alice');
+        expect(rows[3]).toHaveTextContent('Charlie');
+      });
+      // Re-open menu, re-fetch items, check icons
+      fireEvent.click(screen.getByRole('button', { name: /Sort/i })); 
+      const freshAgeSortItem = screen.getByRole('button', { name: 'Age' });
+      const freshNameSortItem = screen.getByRole('button', { name: 'Name' });
+      expect(freshAgeSortItem.querySelector('svg[data-icon="heroicons-outline:arrow-up"]')).toBeInTheDocument();
+      expect(freshNameSortItem.querySelector('svg[data-icon="heroicons-outline:arrow-up"]')).not.toBeInTheDocument();
+      expect(freshNameSortItem.querySelector('svg[data-icon="heroicons-outline:arrow-down"]')).not.toBeInTheDocument();
+    });
+
+    it('sorts by Age using Enter key, then Space key for descending', async () => {
+      // Menu is open from beforeEach
+      let ageSortItem = screen.getByRole('button', { name: 'Age' });
+
+      // 1. Sort Ascending by Age with Enter key
+      fireEvent.keyDown(ageSortItem, { key: 'Enter', code: 'Enter' }); // Closes menu
+      await waitFor(() => { // Wait for table rows to update
+        const rows = screen.getAllByRole('row');
+        expect(rows[1]).toHaveTextContent('Bob');
+      });
+      fireEvent.click(screen.getByRole('button', { name: /Sort/i })); // Re-open menu
+      ageSortItem = screen.getByRole('button', { name: 'Age' }); // Re-fetch item
+      expect(ageSortItem.querySelector('svg[data-icon="heroicons-outline:arrow-up"]')).toBeInTheDocument();
+
+      // 2. Sort Descending by Age with Space key (Menu is currently open, ageSortItem is fresh)
+      fireEvent.keyDown(ageSortItem, { key: ' ', code: 'Space' }); // Closes menu
+      await waitFor(() => { // Wait for table rows to update
+        const rows = screen.getAllByRole('row');
+        expect(rows[1]).toHaveTextContent('Charlie');
+      });
+      fireEvent.click(screen.getByRole('button', { name: /Sort/i })); // Re-open menu
+      ageSortItem = screen.getByRole('button', { name: 'Age' }); // Re-fetch item
+      expect(ageSortItem.querySelector('svg[data-icon="heroicons-outline:arrow-down"]')).toBeInTheDocument();
     });
   });
 });

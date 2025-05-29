@@ -147,6 +147,27 @@ export const TableBlock: React.FC<TableBlockProps> = ({
       cell: c.cell,
     }));
 
+  const handleMenuSortItemClick = (accessor: string) => {
+    let newDirection: 'asc' | 'desc' | null = 'asc';
+    if (sortColumn === accessor) {
+      if (sortDirection === 'asc') {
+        newDirection = 'desc';
+      } else if (sortDirection === 'desc') {
+        newDirection = null; // Clear sorting
+      } else {
+        // If sortDirection is null but sortColumn is accessor, it means it was just cleared.
+        // A new click should sort asc, which is the default for newDirection.
+        newDirection = 'asc'; 
+      }
+    } else {
+      // New column selected for sorting, default to 'asc'
+      newDirection = 'asc';
+    }
+
+    handleSortChange(accessor, newDirection);
+    setOpenDropdown(null); // Close dropdown
+  };
+
   const handleSelectionChange = (rows: TableRowData[]) => {
     setSelectedRows(rows);
     if (onSelectionChange) onSelectionChange(rows);
@@ -200,88 +221,50 @@ export const TableBlock: React.FC<TableBlockProps> = ({
             {openDropdown === "sort" && (
               <div
                 id="sort-dropdown"
-                tabIndex={-1}
-                ref={sortDropdownRef}
                 style={{
                   position: 'absolute',
-                  top: '110%',
+                  top: '100%',
                   left: 0,
-                  zIndex: 10,
+                  marginTop: 4,
                   background: '#fff',
                   border: '1px solid #e5e7eb',
-                  borderRadius: 8,
-                  boxShadow: '0 2px 8px 0 rgba(0,0,0,0.08)',
-                  padding: 12,
+                  borderRadius: 6,
+                  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)',
+                  zIndex: 10,
+                  padding: 'var(--hero-spacing-1)',
                   minWidth: 180
                 }}
               >
-                <div style={{ fontWeight: 500, marginBottom: 8 }}>Sort by</div>
                 {columns.filter(c => c.sortable).map(col => (
-                  <label key={col.accessor} style={{ display: 'block', marginBottom: 6, cursor: 'pointer' }}>
-                    <input
-                      type="radio"
-                      name="sort-column"
-                      checked={sortColumn === col.accessor}
-                      aria-label={col.header}
-                      onChange={() => {
-                        setSortColumn(col.accessor);
-                        setSortDirection(dir => dir ?? 'asc');
-                      }}
-                      style={{ marginRight: 8 }}
-                    />
+                  <div
+                    key={col.accessor}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => handleMenuSortItemClick(col.accessor)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        handleMenuSortItemClick(col.accessor);
+                      }
+                    }}
+                    style={{
+                      padding: '6px 12px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      borderRadius: 4,
+                      backgroundColor: sortColumn === col.accessor ? '#eff6ff' : 'transparent',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = sortColumn === col.accessor ? '#e0e7ff' : '#f9fafb')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = sortColumn === col.accessor ? '#eff6ff' : 'transparent')}
+                  >
                     {col.header}
-                  </label>
+                    {sortColumn === col.accessor && sortDirection === 'asc' && 
+                      <Icon icon="heroicons-outline:arrow-up" className="w-4 h-4 text-blue-600" />}
+                    {sortColumn === col.accessor && sortDirection === 'desc' && 
+                      <Icon icon="heroicons-outline:arrow-down" className="w-4 h-4 text-blue-600" />}
+                  </div>
                 ))}
-                <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
-                  <button
-                    type="button"
-                    style={{
-                      padding: '4px 12px',
-                      borderRadius: 4,
-                      border: sortDirection === 'asc' ? '2px solid #2563eb' : '1px solid #e5e7eb',
-                      background: sortDirection === 'asc' ? '#eff6ff' : '#fff',
-                      color: sortDirection === 'asc' ? '#2563eb' : '#222',
-                      fontWeight: sortDirection === 'asc' ? 600 : 400,
-                      cursor: 'pointer',
-                      outline: 'none',
-                    }}
-                    onClick={() => setSortDirection('asc')}
-                    disabled={!sortColumn}
-                  >Asc</button>
-                  <button
-                    type="button"
-                    style={{
-                      padding: '4px 12px',
-                      borderRadius: 4,
-                      border: sortDirection === 'desc' ? '2px solid #2563eb' : '1px solid #e5e7eb',
-                      background: sortDirection === 'desc' ? '#eff6ff' : '#fff',
-                      color: sortDirection === 'desc' ? '#2563eb' : '#222',
-                      fontWeight: sortDirection === 'desc' ? 600 : 400,
-                      cursor: 'pointer',
-                      outline: 'none',
-                    }}
-                    onClick={() => setSortDirection('desc')}
-                    disabled={!sortColumn}
-                  >Desc</button>
-                </div>
-                <button
-                  type="button"
-                  style={{
-                    padding: '4px 12px',
-                    borderRadius: 4,
-                    border: '1px solid #e5e7eb',
-                    background: '#f3f4f6',
-                    color: '#2563eb',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    outline: 'none',
-                    width: '100%',
-                    marginTop: 10
-                  }}
-                  onClick={() => { setSortColumn(null); setSortDirection(null); }}
-                >
-                  Clear sorting
-                </button>
               </div>
             )}
           </div>
