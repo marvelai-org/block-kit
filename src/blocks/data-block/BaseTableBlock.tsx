@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo, useEffect, useRef } from 'react';
 import {
   useTable,
   useSortBy,
@@ -7,6 +7,12 @@ import {
   TableInstance,
   HeaderProps,
   CellProps,
+  TableOptions, // Added for casting useTable options
+  UseSortByOptions, // Added for casting useTable options
+  UseSortByState, // Added for typing initialState
+  UseRowSelectState, // Added for typing initialState
+  ColumnInstance, // Added for casting column in render
+  UseSortByColumnProps, // Added for casting column in render
 } from 'react-table';
 import { ChevronUpIcon, ChevronDownIcon, SelectorIcon } from '@heroui/shared-icons';
 import { PageNumbers } from '../../components/Pagination';
@@ -37,11 +43,11 @@ export interface BaseTableBlockProps<T> {
   showPagination?: boolean;
 }
 
-function getRowId<T extends Record<string, any>>(row: T, idx: number): string {
+function getRowId<T extends { id?: string | number; [key: string]: unknown }>(row: T, idx: number): string {
   return row.id ? String(row.id) : String(idx);
 }
 
-export function BaseTableBlock<T extends Record<string, any>>({
+export function BaseTableBlock<T extends { id?: string | number; [key: string]: unknown }>({
   columns,
   data,
   selectable = false,
@@ -133,7 +139,7 @@ export function BaseTableBlock<T extends Record<string, any>>({
           disableSortBy: !col.sortable,
           Cell: col.cell
             ? ({ row }: { row: { original: T } }) => col.cell!(row.original)
-            : ({ value, row }: { value: any, row: { original: T } }) => {
+            : ({ value, row }: { value: unknown, row: { original: T } }) => {
                 const accessor = col.accessor as keyof T;
                 return value !== undefined ? value : row.original[accessor];
               },
@@ -157,7 +163,7 @@ export function BaseTableBlock<T extends Record<string, any>>({
   }, [selectedRows, data, isControlledSelection]);
 
   const isControlledSort = sortColumn !== undefined && sortDirection !== undefined;
-  const initialState: any = {};
+  const initialState: Partial<UseSortByState<T> & UseRowSelectState<T>> = {};
   if (isControlledSort && sortColumn) {
     initialState.sortBy = [
       {
@@ -170,6 +176,8 @@ export function BaseTableBlock<T extends Record<string, any>>({
     initialState.selectedRowIds = selectedRowIds;
   }
 
+  const prevSelectedRowIds = useRef<Record<string, boolean>>({});
+
   const instance = useTable<T>(
     {
       columns: tableColumns,
@@ -177,7 +185,7 @@ export function BaseTableBlock<T extends Record<string, any>>({
       initialState,
       getRowId: (row, idx) => getRowId(row, idx),
       manualSortBy: isControlledSort,
-    },
+    } as TableOptions<T> & UseSortByOptions<T>, // Cast to include UseSortByOptions
     useSortBy,
     useRowSelect
   );
@@ -196,13 +204,18 @@ export function BaseTableBlock<T extends Record<string, any>>({
 
   useEffect(() => {
     if (multiSelect && onSelectionChange) {
-      if (isControlledSelection) {
-        onSelectionChange(selectedRows || []);
-      } else {
+      const currentSelectedRowIds = tableState.selectedRowIds;
+
+      const currentIds = Object.keys(currentSelectedRowIds).sort().join(',');
+      const prevIds = Object.keys(prevSelectedRowIds.current).sort().join(',');
+
+      if (currentIds !== prevIds) {
         onSelectionChange(selectedFlatRows.map((r) => r.original));
+        prevSelectedRowIds.current = currentSelectedRowIds;
       }
     }
-  }, [multiSelect, selectedFlatRows, onSelectionChange, isControlledSelection, selectedRows]);
+  }, [multiSelect, onSelectionChange, tableState.selectedRowIds, selectedFlatRows]);
+
 
   useEffect(() => {
     const sortingState = tableState as typeof tableState & { sortBy?: Array<{ id: string; desc: boolean }> };
@@ -261,40 +274,40 @@ export function BaseTableBlock<T extends Record<string, any>>({
         <thead>
           {headerGroups.map((headerGroup, i) => (
             <tr {...headerGroup.getHeaderGroupProps()} key={i} role="row">
-              {headerGroup.headers.map((column, idx) => (
+              {headerGroup.headers.map((column: ColumnInstance<T> & UseSortByColumnProps<T>, idx: number) => (
                 <th
                   {...column.getHeaderProps(
-                    (column as any).getSortByToggleProps?.() || {}
+                    column.getSortByToggleProps?.() || {}
                   )}
                   key={idx}
-                  style={{ cursor: (column as any).canSort ? 'pointer' : undefined, textAlign: 'left' }}
+                  style={{ cursor: column.canSort ? 'pointer' : undefined, textAlign: 'left' }}
                   aria-sort={
-                    (column as any).canSort
-                      ? (column as any).isSorted
-                        ? (column as any).isSortedDesc
+                    column.canSort
+                      ? column.isSorted
+                        ? column.isSortedDesc
                           ? 'descending'
                           : 'ascending'
                         : 'none'
                       : undefined
                   }
                   onClick={() => {
-                    if ((column as any).canSort) {
-                      (column as any).toggleSortBy();
+                    if (column.canSort) {
+                      column.toggleSortBy();
                     }
                   }}
                   onKeyDown={e => {
-                    if ((column as any).canSort && (e.key === 'Enter' || e.key === ' ')) {
+                    if (column.canSort && (e.key === 'Enter' || e.key === ' ')) {
                       e.preventDefault();
-                      (column as any).toggleSortBy();
+                      column.toggleSortBy();
                     }
                   }}
                 >
-                  {(column as any).canSort ? (
+                  {column.canSort ? (
                     <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                       <span>{column.render('Header')}</span>
-                      <span style={{ marginLeft: 8, display: 'flex', alignItems: 'center', color: (column as any).isSorted ? '#2563eb' : '#888' }}>
-                        {(column as any).isSorted
-                          ? ((column as any).isSortedDesc
+                      <span style={{ marginLeft: 8, display: 'flex', alignItems: 'center', color: column.isSorted ? '#2563eb' : '#888' }}>
+                        {column.isSorted
+                          ? (column.isSortedDesc
                             ? <ChevronDownIcon />
                             : <ChevronUpIcon />)
                           : <SelectorIcon />}

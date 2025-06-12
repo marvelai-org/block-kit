@@ -7,12 +7,33 @@ import { BaseTableBlock, BaseTableBlockColumn } from './BaseTableBlock';
 
 export type TableRowData = Record<string, string | number | boolean | null | undefined>;
 
+export const ALL_FILTER_VALUE = "__all__";
+
+export interface FilterOption<T extends TableRowData = TableRowData> {
+  label: string;
+  value: string;
+  filterFn?: (row: T) => boolean;
+}
+
+export interface FilterGroup<T extends TableRowData = TableRowData> {
+  id: string; // Unique ID for the filter group (e.g., "workerType")
+  name: string; // Display name for the group (e.g., "Worker Type")
+  options: FilterOption<T>[]; // Developer-provided filter options for this group
+}
+
 export interface TableColumn {
   header: string;
   accessor: string;
   cell?: (info: TableRowData) => React.ReactNode;
   sortable?: boolean;
   Filter?: (info: TableRowData) => boolean;
+}
+
+export interface TableAction<T extends TableRowData = TableRowData> {
+  label: string;
+  handler: (selected: T[]) => void;
+  hidden?: (selected: T[]) => boolean;
+  disabled?: (selected: T[]) => boolean;
 }
 
 export interface TableBlockProps extends BlockProps {
@@ -26,6 +47,8 @@ export interface TableBlockProps extends BlockProps {
   selectable?: boolean;
   multiSelect?: boolean;
   onSelectionChange?: (selectedRows: TableRowData[]) => void;
+  filterGroups?: FilterGroup<TableRowData>[];
+  actions?: TableAction<TableRowData>[];
 }
 
 export const TableBlock: React.FC<TableBlockProps> = ({
@@ -43,19 +66,30 @@ export const TableBlock: React.FC<TableBlockProps> = ({
   className,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   onChange,
+  filterGroups: filterGroupsProp, // Renamed prop from destructuring
+  actions = [],
   ...props
 }) => {
-  const [openDropdown, setOpenDropdown] = React.useState<null | "sort" | "columns">(null);
+  // Create a stable reference for filterGroups, especially for the default empty array case
+  const filterGroups = React.useMemo(() => filterGroupsProp || [], [filterGroupsProp]);
+
+  const [openDropdown, setOpenDropdown] = React.useState<null | "sort" | "columns" | "filter" | "actions">(null);
   const sortDropdownRef = React.useRef<HTMLDivElement>(null);
   const columnsDropdownRef = React.useRef<HTMLDivElement>(null);
+  const filterDropdownRef = React.useRef<HTMLDivElement>(null);
+  const actionsDropdownRef = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
     if (!openDropdown) return;
     function handle(e: MouseEvent) {
       const sortEl = sortDropdownRef.current;
       const columnsEl = columnsDropdownRef.current;
+      const filterEl = filterDropdownRef.current;
+      const actionsEl = actionsDropdownRef.current;
       if (
         (openDropdown === "sort" && sortEl && !sortEl.contains(e.target as Node)) ||
-        (openDropdown === "columns" && columnsEl && !columnsEl.contains(e.target as Node))
+        (openDropdown === "columns" && columnsEl && !columnsEl.contains(e.target as Node)) ||
+        (openDropdown === "filter" && filterEl && !filterEl.contains(e.target as Node)) ||
+        (openDropdown === "actions" && actionsEl && !actionsEl.contains(e.target as Node))
       ) {
         setOpenDropdown(null);
       }
@@ -92,17 +126,49 @@ export const TableBlock: React.FC<TableBlockProps> = ({
   // Use pageNumber from props for initial state, but let BaseTableBlock handle the pagination
   const [selectedRows, setSelectedRows] = React.useState<TableRowData[]>([]);
   const [searchTerm, setSearchTerm] = React.useState<string>('');
+  const [activeFilters, setActiveFilters] = React.useState<Record<string, string>>({});
+
+  React.useEffect(() => {
+    const initialFilters: Record<string, string> = {};
+    if (filterGroups && filterGroups.length > 0) {
+      filterGroups.forEach(group => {
+        initialFilters[group.id] = ALL_FILTER_VALUE;
+      });
+    }
+    setActiveFilters(initialFilters);
+  }, [filterGroups]);
 
   // Compose filtering and sorting
+  const dataAfterGlobalFilters = React.useMemo(() => {
+    if (!filterGroups || filterGroups.length === 0 || Object.keys(activeFilters).length === 0) {
+      return data;
+    }
+
+    return data.filter(row => {
+      return filterGroups.every(group => {
+        const selectedOptionValue = activeFilters[group.id];
+        if (!selectedOptionValue || selectedOptionValue === ALL_FILTER_VALUE) {
+          return true; // No filter applied for this group or 'All' is selected
+        }
+
+        const selectedOption = group.options.find(opt => opt.value === selectedOptionValue);
+        if (selectedOption && selectedOption.filterFn) {
+          return selectedOption.filterFn(row);
+        }
+        return true; // Should not happen if data is consistent, but default to true
+      });
+    });
+  }, [data, filterGroups, activeFilters]);
+
   const filteredData = React.useMemo(() => {
-    if (!searchTerm) return data;
-    return data.filter(row =>
+    if (!searchTerm) return dataAfterGlobalFilters;
+    return dataAfterGlobalFilters.filter(row =>
       columns.some(column => {
         const val = row[column.accessor];
         return val != null && val.toString().toLowerCase().includes(searchTerm.toLowerCase());
       })
     );
-  }, [searchTerm, data, columns]);
+  }, [searchTerm, dataAfterGlobalFilters, columns]);
 
   // Sorted data based on sortColumn/sortDirection
   const sortedData = React.useMemo(() => {
@@ -204,7 +270,65 @@ export const TableBlock: React.FC<TableBlockProps> = ({
               onChange={e => setSearchTerm(e.target.value)}
             />
           </div>
-          <Button size="sm" variant="light"><Icon icon="heroicons-outline:funnel" className="w-4 h-4 mr-1" />Filter</Button>
+          {/* Filter Dropdown Button */}
+          {filterGroups.length > 0 && (
+            <div style={{ position: 'relative', display: 'inline-block' }} ref={filterDropdownRef}>
+              <Button
+                size="sm"
+                variant="light"
+                aria-haspopup="true"
+                aria-expanded={openDropdown === "filter"}
+                aria-controls="filter-dropdown"
+                onClick={() => setOpenDropdown(openDropdown === "filter" ? null : "filter")}
+              >
+                <Icon icon="heroicons-outline:funnel" className="w-4 h-4 mr-1" />Filter
+              </Button>
+              {openDropdown === "filter" && (
+                <div
+                  id="filter-dropdown"
+                  data-testid="filter-dropdown"
+                  tabIndex={-1} // Allows focus for ESC key, but not direct tab
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    marginTop: 4,
+                    background: '#fff',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: 6,
+                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)',
+                    zIndex: 10,
+                    padding: 'var(--hero-spacing-2)', // Slightly more padding for groups
+                    minWidth: 220, // Wider for filter options
+                    maxHeight: '400px', // Prevent overly long dropdowns
+                    overflowY: 'auto', // Scroll if content exceeds maxHeight
+                  }}
+                >
+                  {filterGroups.map(group => (
+                    <div key={group.id} style={{ marginBottom: 'var(--hero-spacing-3)' }}>
+                      <Text size="sm" weight="medium" style={{ marginBottom: 'var(--hero-spacing-1)' }}>{group.name}</Text>
+                      {[ // Prepend 'All' option
+                        { label: 'All', value: ALL_FILTER_VALUE, filterFn: undefined }, 
+                        ...group.options
+                      ].map(option => (
+                        <label key={option.value} style={{ display: 'flex', alignItems: 'center', marginBottom: 'var(--hero-spacing-0-5)', cursor: 'pointer' }}>
+                          <input
+                            type="radio"
+                            name={group.id} // Ensures only one radio in the group is selected
+                            value={option.value}
+                            checked={activeFilters[group.id] === option.value}
+                            onChange={() => setActiveFilters(prev => ({ ...prev, [group.id]: option.value }))}
+                            style={{ marginRight: 'var(--hero-spacing-1)' }}
+                          />
+                          {option.label}
+                        </label>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           <div style={{ position: 'relative', display: 'inline-block' }} ref={sortDropdownRef}>
             <Button
               size="sm"
@@ -331,8 +455,72 @@ export const TableBlock: React.FC<TableBlockProps> = ({
           </div>
         </div>
         <div style={{ display: 'flex', gap: 'var(--hero-spacing-2)', alignItems: 'center' }}>
-          {selectable && <Text size="sm"><strong>{selectedRows.length}</strong> Selected</Text>}
-          <Button size="sm" variant="light" disabled={selectedRows.length === 0}>Selected Actions</Button>
+          {selectable && (
+            <Text size="sm" className="text-gray-600">
+              {selectedRows.length} item{selectedRows.length === 1 ? '' : 's'} selected
+            </Text>
+          )}
+          {selectable && actions.length > 0 && selectedRows.length > 0 && (
+            <div style={{ position: 'relative' }} ref={actionsDropdownRef}>
+              <Button
+                size="sm"
+                variant="light"
+                onClick={() => setOpenDropdown(openDropdown === 'actions' ? null : 'actions')}
+                aria-haspopup="menu"
+                aria-expanded={openDropdown === 'actions'}
+              >
+                Selected Actions <Icon icon="heroicons-outline:chevron-down" className="w-4 h-4" />
+              </Button>
+              {openDropdown === 'actions' && (
+                <div
+                  role="menu"
+                  style={{
+                    position: 'absolute',
+                    right: 0,
+                    marginTop: '4px',
+                    background: '#fff',
+                    border: '1px solid var(--hero-color-border)',
+                    borderRadius: '4px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                    zIndex: 20,
+                    minWidth: '160px',
+                  }}
+                >
+                  {actions.map((action, idx) => {
+                    const isHidden = action.hidden?.(selectedRows) ?? false;
+                    if (isHidden) return null;
+                    const isDisabled = action.disabled?.(selectedRows) ?? false;
+                    return (
+                      <button
+                        key={idx}
+                        role="menuitem"
+                        type="button"
+                        onClick={() => {
+                          if (isDisabled) return;
+                          action.handler(selectedRows);
+                          setOpenDropdown(null);
+                        }}
+                        disabled={isDisabled}
+                        style={{
+                          display: 'block',
+                          width: '100%',
+                          textAlign: 'left',
+                          padding: '6px 12px',
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: isDisabled ? 'not-allowed' : 'pointer',
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f9fafb')}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                      >
+                        {action.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
       <div style={{ overflowX: 'auto' }}>

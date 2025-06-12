@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react';
-import { TableBlock, TableRowData } from '@/blocks/data-block/TableBlock';
+import { TableBlock, TableRowData, FilterGroup } from '@/blocks/data-block/TableBlock';
 import { CheckIcon, CloseIcon } from '@heroui/shared-icons';
 import { fn } from '@storybook/test';
 
@@ -10,18 +10,39 @@ const meta: Meta<typeof TableBlock> = {
   argTypes: {
     columns: { control: 'object' },
     data: { control: 'object' },
-    striped: { control: 'boolean' },
-    bordered: { control: 'boolean' },
-    compact: { control: 'boolean' },
+    // striped, bordered, compact removed as they should be inferred or are not direct props for argTypes control
   },
   args: {
     onSelectionChange: fn(),
-    onSortChange: fn(),
+    // onSort removed from meta.args, will be defined in individual stories
   },
 };
 
 export default meta;
 type Story = StoryObj<typeof TableBlock>;
+
+// Define filterGroups
+const exampleFilterGroups: FilterGroup[] = [
+  {
+    id: 'status',
+    name: 'Status',
+    options: [
+      { label: 'Active', value: 'active', filterFn: (row) => row.status === 'Active' },
+      { label: 'Inactive', value: 'inactive', filterFn: (row) => row.status === 'Inactive' },
+    ],
+  },
+  {
+    id: 'decade',
+    name: 'Age Decade',
+    options: [
+      { label: '20-29', value: '20s', filterFn: (row) => typeof row.age === 'number' && row.age >= 20 && row.age <= 29 },
+      { label: '30-39', value: '30s', filterFn: (row) => typeof row.age === 'number' && row.age >= 30 && row.age <= 39 },
+      { label: '40-49', value: '40s', filterFn: (row) => typeof row.age === 'number' && row.age >= 40 && row.age <= 49 },
+      { label: '50-59', value: '50s', filterFn: (row) => typeof row.age === 'number' && row.age >= 50 && row.age <= 59 },
+      { label: '60+', value: '60plus', filterFn: (row) => typeof row.age === 'number' && row.age >= 60 },
+    ],
+  },
+];
 
 export const Basic: Story = {
   args: {
@@ -37,7 +58,7 @@ export const Basic: Story = {
       { name: 'Bob Johnson', age: 45, status: 'Active' },
     ],
     onSelectionChange: fn(),
-    onSortChange: fn(),
+    // onSort removed as it's not essential for this basic story and causing TS issues
   },
 };
 
@@ -56,7 +77,7 @@ export const WithTitle: Story = {
     ],
     title: 'List of Users',
     onSelectionChange: fn(),
-    onSortChange: fn(),
+    // onSort removed as it's not essential for this story and causing TS issues
   },
 };
 
@@ -241,11 +262,49 @@ export const Customized: Story = {
       { name: 'Ezra McLeod', age: 49, status: 'Active' },
       { name: 'Ayla Hensley', age: 22, status: 'Inactive' }
     ],
-    striped: true,
-    bordered: true,
-    compact: true,
     selectable: true,
+    actions: [
+      {
+        label: 'Log Selected',
+        handler: (rows: TableRowData[]) => console.log('Selected rows', rows),
+      },
+      {
+        label: 'Alert Count',
+        handler: (rows: TableRowData[]) => alert(`${rows.length} selected`),
+        disabled: rows => rows.length === 0,
+      },
+    ],
     onSelectionChange: fn(),
-    onSortChange: fn(),
+    onSort: fn(), // Corrected from onSortChange
+    // Add the filterGroups prop
+    filterGroups: exampleFilterGroups,
+  } as Partial<import('@/blocks/data-block/TableBlock').TableBlockProps>,
+};
+
+export const WithBulkActions: Story = {
+  args: {
+    id: 'table-bulk-actions-example',
+    columns: [
+      { header: 'Name', accessor: 'name' },
+      { header: 'Age', accessor: 'age' },
+      { header: 'Status', accessor: 'status' },
+    ],
+    data: [
+      { name: 'John Doe', age: 28, status: 'Active' },
+      { name: 'Caleb Stone', age: 34, status: 'Inactive' },
+      { name: 'Bob Johnson', age: 45, status: 'Active' },
+    ],
+    selectable: true,
+    actions: [
+      {
+        label: 'Log Selected',
+        handler: (rows: TableRowData[]) => console.log('Selected rows', rows),
+      },
+      {
+        label: 'Alert Names',
+        handler: (rows: TableRowData[]) => alert(rows.map(r => r.name).join(', ')),
+        disabled: (rows) => rows.length === 0,
+      },
+    ],
   },
 };
