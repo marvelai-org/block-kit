@@ -280,31 +280,3 @@ export const Customized: Story = {
     filterGroups: exampleFilterGroups,
   } as Partial<import('@/blocks/data-block/TableBlock').TableBlockProps>,
 };
-
-export const WithBulkActions: Story = {
-  args: {
-    id: 'table-bulk-actions-example',
-    columns: [
-      { header: 'Name', accessor: 'name' },
-      { header: 'Age', accessor: 'age' },
-      { header: 'Status', accessor: 'status' },
-    ],
-    data: [
-      { name: 'John Doe', age: 28, status: 'Active' },
-      { name: 'Caleb Stone', age: 34, status: 'Inactive' },
-      { name: 'Bob Johnson', age: 45, status: 'Active' },
-    ],
-    selectable: true,
-    actions: [
-      {
-        label: 'Log Selected',
-        handler: (rows: TableRowData[]) => console.log('Selected rows', rows),
-      },
-      {
-        label: 'Alert Names',
-        handler: (rows: TableRowData[]) => alert(rows.map(r => r.name).join(', ')),
-        disabled: (rows) => rows.length === 0,
-      },
-    ],
-  },
-};

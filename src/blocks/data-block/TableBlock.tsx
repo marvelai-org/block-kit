@@ -329,67 +329,69 @@ export const TableBlock: React.FC<TableBlockProps> = ({
               )}
             </div>
           )}
-          <div style={{ position: 'relative', display: 'inline-block' }} ref={sortDropdownRef}>
-            <Button
-              size="sm"
-              variant="light"
-              aria-haspopup="true"
-              aria-expanded={openDropdown === "sort"}
-              aria-controls="sort-dropdown"
-              onClick={() => setOpenDropdown(openDropdown === "sort" ? null : "sort")}
-            >
-              <Icon icon="heroicons-outline:arrows-up-down" className="w-4 h-4 mr-1" />Sort
-            </Button>
-            {openDropdown === "sort" && (
-              <div
-                id="sort-dropdown"
-                style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: 0,
-                  marginTop: 4,
-                  background: '#fff',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: 6,
-                  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)',
-                  zIndex: 10,
-                  padding: 'var(--hero-spacing-1)',
-                  minWidth: 180
-                }}
+          {columns.some(col => col.sortable) && (
+            <div style={{ position: 'relative', display: 'inline-block' }} ref={sortDropdownRef}>
+              <Button
+                size="sm"
+                variant="light"
+                aria-haspopup="true"
+                aria-expanded={openDropdown === "sort"}
+                aria-controls="sort-dropdown"
+                onClick={() => setOpenDropdown(openDropdown === "sort" ? null : "sort")}
               >
-                {columns.filter(c => c.sortable).map(col => (
-                  <div
-                    key={col.accessor}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => handleMenuSortItemClick(col.accessor)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        handleMenuSortItemClick(col.accessor);
-                      }
-                    }}
-                    style={{
-                      padding: '6px 12px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      borderRadius: 4,
-                      backgroundColor: sortColumn === col.accessor ? '#eff6ff' : 'transparent',
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = sortColumn === col.accessor ? '#e0e7ff' : '#f9fafb')}
-                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = sortColumn === col.accessor ? '#eff6ff' : 'transparent')}
-                  >
-                    {col.header}
-                    {sortColumn === col.accessor && sortDirection === 'asc' && 
-                      <Icon icon="heroicons-outline:arrow-up" className="w-4 h-4 text-blue-600" />}
-                    {sortColumn === col.accessor && sortDirection === 'desc' && 
-                      <Icon icon="heroicons-outline:arrow-down" className="w-4 h-4 text-blue-600" />}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+                <Icon icon="heroicons-outline:arrows-up-down" className="w-4 h-4 mr-1" />Sort
+              </Button>
+            {openDropdown === "sort" && (
+                <div
+                  id="sort-dropdown"
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    marginTop: 4,
+                    background: '#fff',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: 6,
+                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)',
+                    zIndex: 10,
+                    padding: 'var(--hero-spacing-1)',
+                    minWidth: 180
+                  }}
+                >
+                  {columns.filter(c => c.sortable).map(col => (
+                    <div
+                      key={col.accessor}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => handleMenuSortItemClick(col.accessor)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          handleMenuSortItemClick(col.accessor);
+                        }
+                      }}
+                      style={{
+                        padding: '6px 12px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        borderRadius: 4,
+                        backgroundColor: sortColumn === col.accessor ? '#eff6ff' : 'transparent',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = sortColumn === col.accessor ? '#e0e7ff' : '#f9fafb')}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = sortColumn === col.accessor ? '#eff6ff' : 'transparent')}
+                    >
+                      {col.header}
+                      {sortColumn === col.accessor && sortDirection === 'asc' && 
+                        <Icon icon="heroicons-outline:arrow-up" className="w-4 h-4 text-blue-600" />}
+                      {sortColumn === col.accessor && sortDirection === 'desc' && 
+                        <Icon icon="heroicons-outline:arrow-down" className="w-4 h-4 text-blue-600" />}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           <div style={{ position: 'relative', display: 'inline-block' }} ref={columnsDropdownRef}>
             <Button
               size="sm"
