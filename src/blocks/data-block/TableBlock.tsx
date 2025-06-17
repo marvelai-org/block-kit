@@ -5,6 +5,33 @@ import { BlockProps } from '../../types';
 import { Icon } from '@iconify/react';
 import { BaseTableBlock, BaseTableBlockColumn } from './BaseTableBlock';
 
+// Helper function for ASCENDING comparison of table values
+function compareTableValuesAsc(valA: string | number | boolean | null | undefined, valB: string | number | boolean | null | undefined): number {
+  // Handle null/undefined: nulls are considered larger (sort to the end for asc)
+  if (valA == null && valB == null) return 0;
+  if (valA == null) return 1; // valA is null, valB is not, so valA is greater
+  if (valB == null) return -1; // valB is null, valA is not, so valA is smaller
+
+  // Handle numbers
+  if (typeof valA === 'number' && typeof valB === 'number') {
+    return valA - valB;
+  }
+
+  // Handle strings (and booleans converted to strings)
+  const strA = String(valA).toLowerCase();
+  const strB = String(valB).toLowerCase();
+
+  if (strA < strB) return -1;
+  if (strA > strB) return 1;
+  return 0;
+}
+
+// Main comparison function using the ascending helper
+function compareTableValues(valA: string | number | boolean | null | undefined, valB: string | number | boolean | null | undefined, direction: 'asc' | 'desc'): number {
+  const ascResult = compareTableValuesAsc(valA, valB);
+  return direction === 'asc' ? ascResult : -ascResult;
+}
+
 export type TableRowData = Record<string, string | number | boolean | null | undefined>;
 
 export const ALL_FILTER_VALUE = "__all__";
@@ -171,29 +198,6 @@ export const TableBlock: React.FC<TableBlockProps> = ({
       })
     );
   }, [searchTerm, dataAfterGlobalFilters, columns]);
-
-  // Helper function for comparing table values
-function compareTableValues(valA: string | number | boolean | null | undefined, valB: string | number | boolean | null | undefined, direction: 'asc' | 'desc'): number {
-  // Handle null/undefined
-  if (valA == null && valB == null) return 0;
-  if (valA == null) return direction === 'asc' ? 1 : -1; // nulls last for asc
-  if (valB == null) return direction === 'asc' ? -1 : 1; // nulls first for asc
-
-  // Handle string and number
-  if (typeof valA === 'number' && typeof valB === 'number') {
-    return direction === 'asc' ? valA - valB : valB - valA;
-  }
-
-  const strA = String(valA).toLowerCase();
-  const strB = String(valB).toLowerCase();
-
-  if (strA === strB) return 0;
-
-  if (direction === 'asc') {
-    return strA < strB ? -1 : 1;
-  }
-  return strA > strB ? -1 : 1;
-}
 
 // Sorted data based on sortColumn/sortDirection
   const sortedData = React.useMemo(() => {
