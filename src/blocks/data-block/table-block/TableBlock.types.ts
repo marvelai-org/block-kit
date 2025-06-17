@@ -8,7 +8,7 @@ export type TableColumn<T> = {
   accessor: keyof T | string;
   sortable?: boolean;
   filterable?: boolean;
-  renderCell?: (value: any, row: T) => ReactNode;
+  renderCell?: (value: T[keyof T], row: T) => ReactNode;
   width?: number | string;
   // Extend as needed for custom features
 };

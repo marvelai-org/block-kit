@@ -80,17 +80,19 @@ export const TableBlock: React.FC<TableBlockProps> = ({
   const actionsDropdownRef = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
     if (!openDropdown) return;
+    const dropdownRefs = {
+      sort: sortDropdownRef,
+      columns: columnsDropdownRef,
+      filter: filterDropdownRef,
+      actions: actionsDropdownRef,
+    };
+
     function handle(e: MouseEvent) {
-      const sortEl = sortDropdownRef.current;
-      const columnsEl = columnsDropdownRef.current;
-      const filterEl = filterDropdownRef.current;
-      const actionsEl = actionsDropdownRef.current;
-      if (
-        (openDropdown === "sort" && sortEl && !sortEl.contains(e.target as Node)) ||
-        (openDropdown === "columns" && columnsEl && !columnsEl.contains(e.target as Node)) ||
-        (openDropdown === "filter" && filterEl && !filterEl.contains(e.target as Node)) ||
-        (openDropdown === "actions" && actionsEl && !actionsEl.contains(e.target as Node))
-      ) {
+      if (!openDropdown) return;
+
+      const currentDropdownRef = dropdownRefs[openDropdown];
+
+      if (currentDropdownRef && currentDropdownRef.current && !currentDropdownRef.current.contains(e.target as Node)) {
         setOpenDropdown(null);
       }
     }
@@ -170,27 +172,37 @@ export const TableBlock: React.FC<TableBlockProps> = ({
     );
   }, [searchTerm, dataAfterGlobalFilters, columns]);
 
-  // Sorted data based on sortColumn/sortDirection
+  // Helper function for comparing table values
+function compareTableValues(valA: string | number | boolean | null | undefined, valB: string | number | boolean | null | undefined, direction: 'asc' | 'desc'): number {
+  // Handle null/undefined
+  if (valA == null && valB == null) return 0;
+  if (valA == null) return direction === 'asc' ? 1 : -1; // nulls last for asc
+  if (valB == null) return direction === 'asc' ? -1 : 1; // nulls first for asc
+
+  // Handle string and number
+  if (typeof valA === 'number' && typeof valB === 'number') {
+    return direction === 'asc' ? valA - valB : valB - valA;
+  }
+
+  const strA = String(valA).toLowerCase();
+  const strB = String(valB).toLowerCase();
+
+  if (strA === strB) return 0;
+
+  if (direction === 'asc') {
+    return strA < strB ? -1 : 1;
+  }
+  return strA > strB ? -1 : 1;
+}
+
+// Sorted data based on sortColumn/sortDirection
   const sortedData = React.useMemo(() => {
     if (sortColumn && sortDirection) {
-      const result = [...filteredData].sort((a, b) => {
-        const av = a[sortColumn];
-        const bv = b[sortColumn];
-        // Handle null/undefined
-        if (av == null && bv == null) return 0;
-        if (av == null) return sortDirection === 'asc' ? 1 : -1;
-        if (bv == null) return sortDirection === 'asc' ? -1 : 1;
-        // Handle string and number
-        if (typeof av === 'number' && typeof bv === 'number') {
-          return sortDirection === 'asc' ? av - bv : bv - av;
-        }
-        const avStr = av.toString();
-        const bvStr = bv.toString();
-        if (avStr === bvStr) return 0;
-        if (sortDirection === 'asc') return avStr < bvStr ? -1 : 1;
-        return avStr > bvStr ? -1 : 1;
+      return [...filteredData].sort((a, b) => {
+        const valA = a[sortColumn];
+        const valB = b[sortColumn];
+        return compareTableValues(valA, valB, sortDirection);
       });
-      return result;
     }
     return filteredData;
   }, [filteredData, sortColumn, sortDirection]);

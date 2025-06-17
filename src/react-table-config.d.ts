@@ -2,8 +2,6 @@ import {
   UseSortByOptions,
   UseSortByState,
   UseSortByHooks,
-  UseSortByColumnOptions,
-  UseSortByColumnProps,
   UseSortByInstanceProps,
   UseSortByRowProps,
   UseRowSelectHooks,
@@ -23,7 +21,7 @@ declare module 'react-table' {
       // underlying js library, but might be cleaner if it's replaced by a more specific type that matches your
       // feature set, like if you had a filter plugin typed
       // UseFiltersOptions<D>
-      Record<string, any> {}
+      Record<string, unknown> {}
 
   export interface Hooks<D extends Record<string, unknown> = Record<string, unknown>>
     extends UseSortByHooks<D>,
@@ -37,11 +35,7 @@ declare module 'react-table' {
     extends UseSortByState<D>,
       UseRowSelectState<D> {}
 
-  export interface ColumnInterface<D extends Record<string, unknown> = Record<string, unknown>>
-    extends UseSortByColumnOptions<D> {}
 
-  export interface ColumnInstance<D extends Record<string, unknown> = Record<string, unknown>>
-    extends UseSortByColumnProps<D> {}
 
   export interface Row<D extends Record<string, unknown> = Record<string, unknown>>
     extends UseSortByRowProps<D>,
