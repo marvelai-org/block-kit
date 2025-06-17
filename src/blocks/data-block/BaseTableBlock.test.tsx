@@ -152,7 +152,7 @@ describe('BaseTableBlock', () => {
       const [sortColumn, setSortColumn] = React.useState<string | null>(null);
       const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc' | null>(null);
       // Sort data manually for test
-      let sorted = [...data];
+      const sorted = [...data];
       if (sortColumn && sortDirection) {
         sorted.sort((a, b) => {
           const av = a[sortColumn as keyof RowData];

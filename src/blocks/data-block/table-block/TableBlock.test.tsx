@@ -1,10 +1,9 @@
 // TableBlock.test.tsx
 // Basic tests scaffold for TableBlock component
 
-import React from 'react';
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import { TableBlock, TableBlockProps } from '../TableBlock';
+import { TableBlock } from '../TableBlock';
 
 describe('TableBlock', () => {
   const columns = [

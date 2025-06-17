@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { BaseTableBlock, BaseTableBlockColumn } from '@/blocks/data-block/BaseTableBlock';
-import React from 'react';
+
 import { fn } from '@storybook/test';
 
 const meta: Meta<typeof BaseTableBlock> = {
@@ -16,9 +16,18 @@ const meta: Meta<typeof BaseTableBlock> = {
 };
 
 export default meta;
-type Story = StoryObj<typeof BaseTableBlock>;
+type Story = StoryObj<typeof BaseTableBlock<TableRowData>>;
 
-const columns: BaseTableBlockColumn<any>[] = [
+// Define a type that matches the constraints of BaseTableBlock's generic type
+interface TableRowData {
+  id?: string | number;
+  name: string;
+  age: number;
+  status: string;
+  [key: string]: unknown;
+}
+
+const columns: BaseTableBlockColumn<TableRowData>[] = [
   { header: 'Name', accessor: 'name' },
   { header: 'Age', accessor: 'age' },
   { header: 'Status', accessor: 'status' },
@@ -42,8 +51,8 @@ export const Basic: Story = {
 export const WithCustomCells: Story = {
   args: {
     columns: [
-      { header: 'Name', accessor: 'name', cell: row => <b>{row.name}</b> },
-      { header: 'Age', accessor: 'age', cell: row => <span style={{ color: row.age > 30 ? 'red' : 'green' }}>{row.age}</span> },
+      { header: 'Name', accessor: 'name', cell: (row: TableRowData) => <b>{row.name}</b> },
+      { header: 'Age', accessor: 'age', cell: (row: TableRowData) => <span style={{ color: Number(row.age) > 30 ? 'red' : 'green' }}>{row.age}</span> },
       { header: 'Status', accessor: 'status' },
     ],
     data,
@@ -52,16 +61,7 @@ export const WithCustomCells: Story = {
   },
 };
 
-export const SingleSelect: Story = {
-  args: {
-    columns,
-    data,
-    selectable: true,
-    multiSelect: false,
-    onSelectionChange: fn(),
-    onSortChange: fn(),
-  },
-};
+
 
 export const MultiSelect: Story = {
   args: {
@@ -74,27 +74,7 @@ export const MultiSelect: Story = {
   },
 };
 
-export const ControlledSelection: Story = {
-  render: (args) => {
-    const [selectedRows, setSelectedRows] = React.useState([data[0]]);
-    return (
-      <BaseTableBlock
-        {...args}
-        selectable
-        multiSelect
-        selectedRows={selectedRows}
-        onSelectionChange={setSelectedRows}
-        onSortChange={fn()}
-      />
-    );
-  },
-  args: {
-    columns,
-    data,
-    onSelectionChange: fn(),
-    onSortChange: fn(),
-  },
-};
+
 
 export const Sortable: Story = {
   args: {
