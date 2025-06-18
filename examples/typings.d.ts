@@ -4,7 +4,6 @@ declare module '@vibing-ai/block-kit' {
 
   // Theme types
   export type ThemeType = 'light' | 'dark' | CustomTheme;
-  
   interface CustomTheme {
     type: 'light' | 'dark';
     primary?: string;
@@ -266,7 +265,7 @@ declare module '@vibing-ai/block-kit' {
     isActive?: boolean;
     onClick?: () => void;
   }
-  
+
   // Component exports
   export function BlockKitProvider(props: BlockKitProviderProps): JSX.Element;
   export function TextBlock(props: TextBlockProps): JSX.Element;
@@ -292,7 +291,10 @@ declare module '@vibing-ai/block-kit' {
   export function CanvasBlock(props: CanvasBlockProps): JSX.Element;
   export function FormBuilder(props: FormBuilderProps): JSX.Element;
   export function ConversationCard(props: ConversationCardProps): JSX.Element;
+  export function PromptContainerFullLineBottomActionsBlock(
+    props: PromptContainerFullLineBottomActionsBlockProps
+  ): JSX.Element;
 
   // Theme utilities
   export function createCustomTheme(options: CustomTheme): CustomTheme;
-} 
+}
