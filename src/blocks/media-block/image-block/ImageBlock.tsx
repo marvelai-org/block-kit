@@ -1,7 +1,11 @@
 import * as React from 'react';
 import { useState, useRef, useEffect, useCallback, useMemo, forwardRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { ImageBlockProps, BorderRadiusScale, ShadowScale } from './types';
+import type { ImageBlockProps } from './types';
+
+// Define local type aliases for better type safety
+type BorderRadiusScale = 'none' | 'sm' | 'md' | 'lg' | 'full';
+type ShadowScale = 'none' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
 
 // Utility function to join class names
 const cn = (...classes: Array<string | boolean | undefined>): string => 
@@ -60,7 +64,7 @@ const ImageBlock = forwardRef<HTMLDivElement, ImageBlockProps>(({
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Combine forwarded ref with local ref
-  React.useImperativeHandle(forwardedRef, () => containerRef.current!);
+  React.useImperativeHandle(forwardedRef, () => containerRef.current ?? document.createElement('div'), []);
 
   // Process image source with proper type safety
   const mainSrc = useMemo((): string => {
@@ -92,9 +96,10 @@ const ImageBlock = forwardRef<HTMLDivElement, ImageBlockProps>(({
   }, [srcProp]);
 
   // Event handlers
-  const handleError = useCallback((_e: React.SyntheticEvent<HTMLImageElement>) => {
-    onErrorProp?.(new Error('Failed to load image'));
-  }, [onErrorProp]);
+  const handleError = useCallback(() => {
+    const error = new Error(`Failed to load image: ${mainSrc}`);
+    onErrorProp?.(error);
+  }, [onErrorProp, mainSrc]);
 
   const handleLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
     setIsLoaded(true);
@@ -110,6 +115,13 @@ const ImageBlock = forwardRef<HTMLDivElement, ImageBlockProps>(({
     e.preventDefault();
     if (e.target === e.currentTarget) setIsZoomed(false);
   }, []);
+
+  // Handle zoom state and body overflow
+
+  // Set initial source (LQIP if available, otherwise main source)
+  useEffect(() => {
+    setCurrentSrc(lqip || mainSrc);
+  }, [lqip, mainSrc]);
 
   // Handle zoom state and body overflow
   useEffect(() => {
@@ -132,21 +144,8 @@ const ImageBlock = forwardRef<HTMLDivElement, ImageBlockProps>(({
         document.body.style.overflow = '';
         document.documentElement.style.overflow = '';
       };
-    } else {
-      document.body.style.overflow = '';
-      document.documentElement.style.overflow = '';
     }
-    
-    return () => {
-      document.body.style.overflow = '';
-      document.documentElement.style.overflow = '';
-    };
   }, [isZoomed]);
-
-  // Set initial source (LQIP if available, otherwise main source)
-  useEffect(() => {
-    setCurrentSrc(lqip || mainSrc);
-  }, [lqip, mainSrc]);
 
   // Styles
   const containerStyle: React.CSSProperties = {
@@ -188,23 +187,25 @@ const ImageBlock = forwardRef<HTMLDivElement, ImageBlockProps>(({
   if (!srcProp) return null;
 
   return (
-    <div
-      ref={containerRef}
-      data-testid="image-block-container"
-      className={cn('image-block-container', className, zoomable ? 'cursor-zoom-in' : '')}
-      style={containerStyle}
-      role={zoomable ? 'button' : 'img'}
-      aria-label={zoomable ? `${alt} (click to zoom)` : alt}
-      tabIndex={zoomable ? 0 : undefined}
-      onClick={zoomable ? handleImageClick : undefined}
-      onKeyDown={zoomable ? (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          handleImageClick();
-        }
-      } : undefined}
-      {...props}
-    >
+    <>
+      <div
+        ref={containerRef}
+        data-testid="image-block-container"
+        className={cn('image-block-container', className, zoomable ? 'cursor-zoom-in' : '')}
+        style={containerStyle}
+        role={zoomable ? 'button' : 'presentation'}
+        aria-label={zoomable ? alt || 'Zoomable image' : undefined}
+        aria-hidden={!zoomable ? false : undefined}
+        tabIndex={zoomable ? 0 : undefined}
+        onClick={zoomable ? handleImageClick : undefined}
+        onKeyDown={zoomable ? (e: React.KeyboardEvent) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleImageClick();
+          }
+        } : undefined}
+        {...props}
+      >
       {lqip && (
         <img
           src={lqip}
@@ -223,7 +224,8 @@ const ImageBlock = forwardRef<HTMLDivElement, ImageBlockProps>(({
         height={typeof height === 'number' ? height : undefined}
         loading={loading}
         decoding={decoding}
-        fetchPriority={fetchPriority}
+        // @ts-expect-error - fetchpriority is a valid HTML attribute but not in React's types yet
+        fetchpriority={fetchPriority}
         sizes={sizes}
         className={cn(
           'block w-full h-full',
@@ -237,60 +239,50 @@ const ImageBlock = forwardRef<HTMLDivElement, ImageBlockProps>(({
         onError={handleError}
       />
 
-    <AnimatePresence>
-      {isZoomed && (
-        <motion.div
-          data-testid="zoom-overlay"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
-          style={zoomStyle}
-          onClick={handleOverlayClick}
-          role="dialog"
-          aria-modal="true"
-          aria-label={`Zoomed image: ${alt}`}
-        >
-          <motion.img
-            src={mainSrc}
-            alt={alt}
-            style={{
-              maxWidth: '90vw',
-              maxHeight: '90vh',
-              objectFit: 'contain',
-            }}
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.9, opacity: 0 }}
+      <AnimatePresence>
+        {isZoomed && (
+          <motion.div
+            data-testid="zoom-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-          />
-        </motion.div>
+            style={zoomStyle}
+            onClick={handleOverlayClick}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Zoomed image: ${alt}`}
+          >
+            <motion.img
+              src={mainSrc}
+              alt={alt}
+              style={{
+                maxWidth: '90vw',
+                maxHeight: '90vh',
+                objectFit: 'contain',
+              }}
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {caption && (
+        <figcaption 
+          className="mt-2 text-sm text-gray-600 text-center"
+          data-testid="image-caption"
+        >
+          {caption}
+        </figcaption>
       )}
-    </AnimatePresence>
-
-    {caption && (
-      <div className="image-caption">
-        {caption}
       </div>
-    )}
-    </div>
+    </>
   );
 });
 
-// Properly type the component with forwardRef
-const TypedImageBlock = ImageBlock as React.ForwardRefExoticComponent<
-  ImageBlockProps & React.RefAttributes<HTMLDivElement>
->;
-
 // Set display name for better debugging
-TypedImageBlock.displayName = 'ImageBlock';
+ImageBlock.displayName = 'ImageBlock';
 
-// Create a memoized version of the component
-const MemoizedImageBlock = React.memo(TypedImageBlock);
-
-// Set display name for the memoized component
-MemoizedImageBlock.displayName = 'MemoizedImageBlock';
-
-// Export both named and default exports
-export { TypedImageBlock as ImageBlock };
-export default MemoizedImageBlock;
+export default ImageBlock;
