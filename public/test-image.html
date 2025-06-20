@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ImageBlock Test</title>
+  <style>
+    body { 
+      font-family: Arial, sans-serif; 
+      max-width: 800px; 
+      margin: 0 auto; 
+      padding: 2rem; 
+      line-height: 1.6;
+    }
+    .test { 
+      margin: 2rem 0; 
+      padding: 1.5rem; 
+      border: 1px solid #e5e7eb; 
+      border-radius: 8px;
+      background: #f9fafb;
+    }
+    h1, h2 {
+      color: #111827;
+    }
+    .success { color: #065f46; }
+    .error { color: #b91c1c; }
+    pre {
+      background: #1f2937;
+      color: #f9fafb;
+      padding: 1rem;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-size: 14px;
+    }
+    .test-image {
+      max-width: 100%;
+      height: auto;
+      border-radius: 4px;
+      margin: 1rem 0;
+      display: block;
+    }
+    .test-container {
+      margin-top: 1rem;
+      padding: 1rem;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      background: white;
+    }
+  </style>
+</head>
+<body>
+  <h1>ImageBlock Test</h1>
+  
+  <div class="test">
+    <h2>1. Direct Image (Control)</h2>
+    <div class="test-container">
+      <img 
+        id="direct-img"
+        src="https://picsum.photos/800/450" 
+        alt="Direct image test"
+        width="800"
+        height="450"
+        class="test-image"
+      >
+      <p>Status: <span id="direct-status" class="status">Loading...</span></p>
+      <pre>const img = document.createElement('img');
+img.src = 'https://picsum.photos/800/450';
+document.body.appendChild(img);</pre>
+    </div>
+  </div>
+
+  <div class="test">
+    <h2>2. ImageBlock Component</h2>
+    <div id="app" class="test-container">
+      Loading React component...
+    </div>
+  </div>
+
+  <div class="test">
+    <h2>3. Vanilla JS Implementation</h2>
+    <div id="vanilla-app" class="test-container">
+      <p>Status: <span id="vanilla-status">Loading...</span></p>
+      <div id="vanilla-image-container"></div>
+    </div>
+  </div>
+
+  <!-- Load React -->
+  <script 
+    src="https://unpkg.com/react@18/umd/react.production.min.js"
+    integrity="sha384-0PjC8RKYK5+HM9Xo8E2WqOKqcdvRkPLdG0D5PtRaJya2U1mGCl4ChkFfwDIB6yf"
+    crossorigin="anonymous">
+  </script>
+  <script 
+    src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"
+    integrity="sha384-0PjC8RKYK5+HM9Xo8E2WqOKqcdvRkPLdG0D5PtRaJya2U1mGCl4ChkFfwDIB6yf"
+    crossorigin="anonymous">
+  </script>
+  <script 
+    src="https://unpkg.com/@babel/standalone/babel.min.js"
+    integrity="sha384-+3x3XG0p7a2Q4wfjrR9RkMyY4c4d4aXlPyfrrOpX49zW9fO5M5f5f5f5f5f5f5f"
+    crossorigin="anonymous">
+  </script>
+
+  <script>
+    // Test 1: Direct image load status
+    document.getElementById('direct-img').onload = function() {
+      document.getElementById('direct-status').textContent = '✅ Loaded successfully';
+      document.getElementById('direct-status').className = 'status success';
+    };
+    document.getElementById('direct-img').onerror = function() {
+      document.getElementById('direct-status').textContent = '❌ Failed to load';
+      document.getElementById('direct-status').className = 'status error';
+    };
+
+    // Test 3: Vanilla JS implementation
+    function loadImage(src, containerId, statusId) {
+      const container = document.getElementById(containerId);
+      const statusEl = document.getElementById(statusId);
+      
+      const img = new Image();
+      img.src = src;
+      img.alt = 'Vanilla JS loaded image';
+      img.className = 'test-image';
+      img.width = 800;
+      img.height = 450;
+      
+      img.onload = function() {
+        statusEl.textContent = '✅ Loaded successfully';
+        statusEl.className = 'status success';
+      };
+      
+      img.onerror = function() {
+        statusEl.textContent = '❌ Failed to load';
+        statusEl.className = 'status error';
+      };
+      
+      container.appendChild(img);
+    }
+
+    // Load vanilla JS test
+    loadImage('https://picsum.photos/800/450', 'vanilla-image-container', 'vanilla-status');
+  </script>
+
+  <!-- Simple test component -->
+  <script type="text/babel">
+    function ImageBlock({ src, alt, width, height }) {
+      const [status, setStatus] = React.useState('Loading...');
+      const [hasError, setHasError] = React.useState(false);
+
+      return (
+        <div>
+          <img 
+            src={src} 
+            alt={alt}
+            width={width}
+            height={height}
+            className="test-image"
+            onLoad={() => setStatus('✅ Loaded successfully')}
+            onError={() => {
+              setStatus('❌ Failed to load');
+              setHasError(true);
+              console.error('Image failed to load:', src);
+            }}
+          />
+          <p>Status: <span className={hasError ? 'error' : 'success'}>{status}</span></p>
+          <p>Source: <code>{src}</code></p>
+          {hasError && (
+            <div style={{ marginTop: '1rem', padding: '0.5rem', background: '#fee2e2', borderRadius: '4px' }}>
+              <p>Error details:</p>
+              <pre>{
+                JSON.stringify({
+                  src,
+                  timestamp: new Date().toISOString(),
+                  userAgent: navigator.userAgent
+                }, null, 2)
+              }</pre>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    function App() {
+      return (
+        <div>
+          <ImageBlock 
+            src="https://picsum.photos/800/450"
+            alt="Test image"
+            width={800}
+            height={450}
+          />
+        </div>
+      );
+    }
+
+    // Render the React app
+    const root = ReactDOM.createRoot(document.getElementById('app'));
+    root.render(<App />);
+  </script>
+</body>
+</html>

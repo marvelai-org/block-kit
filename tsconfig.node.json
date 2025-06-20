@@ -1,10 +1,19 @@
 {
   "compilerOptions": {
     "composite": true,
+    "outDir": "./dist",
     "skipLibCheck": true,
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "react",
+    "strict": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
+    "types": ["node", "vitest/globals"]
   },
   "include": ["vite.config.ts", "tsup.config.ts"]
-} 
+}
